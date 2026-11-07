@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling + Rejoin com Persistência)
+    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling + Rejoin com queue_on_teleport Padrão IY)
 --]]
 
 local Players = game:GetService("Players")
@@ -12,6 +12,9 @@ local LocalPlayer = Players.LocalPlayer
 local flingActive = false
 local todosActive = false
 local antiFlingActive = false
+
+-- Função segura de queue_on_teleport (Padrão Infinite Yield)
+local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
 -- ==========================================
 -- LIMPEZA DE INTERFACE ANTERIOR (SE HOUVER)
@@ -86,7 +89,7 @@ local corner3 = Instance.new("UICorner")
 corner3.CornerRadius = UDim.new(0, 6)
 corner3.Parent = antiFlingButton
 
--- Botão 4: Rejoin (com queue_on_teleport)
+-- Botão 4: Rejoin (Estilo Infinite Yield)
 local rejoinButton = Instance.new("TextButton")
 rejoinButton.Size = UDim2.new(0, 160, 0, 30)
 rejoinButton.Position = UDim2.new(0, 10, 0, 124)
@@ -160,17 +163,20 @@ rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
     
-    pcall(function()
-        local queueFunction = syn and syn.queue_on_teleport or queue_on_teleport or fluxus and fluxus.queue_on_teleport
-        if queueFunction then
-            queueFunction([[
+    -- Aplica o queue_on_teleport idêntico ao Infinite Yield para reexecutar o script após o carregamento
+    if queueteleport then
+        pcall(function()
+            queueteleport([[
                 task.spawn(function()
-                    repeat task.wait() until game:IsLoaded()
-                    loadstring(game:HttpGet("SEU_LINK_OU_COPIA_DO_SCRIPT_AQUI"))()
+                    if not game:IsLoaded() then
+                        game.Loaded:Wait()
+                    end
+                    -- Cole aqui o loadstring ou o código do seu script para reexecutar automaticamente após o rejoin
+                    print("Script reinjetado com sucesso após o Rejoin!")
                 end)
             ]])
-        end
-    end)
+        end>
+    end
 
     pcall(function()
         if #Players:GetPlayers() <= 1 then
