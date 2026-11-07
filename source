@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling (Com Alvo por Poucas Letras + Anti-Noclip por Frame) + Puxar Peças
+    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling por Frame)
 --]]
 
 local Players = game:GetService("Players")
@@ -9,7 +9,8 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local flingActive = false
-local partsActive = false
+local todosActive = false
+local antiFlingActive = false
 
 -- ==========================================
 -- LIMPEZA DE INTERFACE ANTERIOR (SE HOUVER)
@@ -27,7 +28,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 150)
+mainFrame.Size = UDim2.new(0, 180, 0, 175)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -39,9 +40,9 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Botão 1: Fling
+-- Botão 1: Fling (Master)
 local flingButton = Instance.new("TextButton")
-flingButton.Size = UDim2.new(0, 160, 0, 35)
+flingButton.Size = UDim2.new(0, 160, 0, 32)
 flingButton.Position = UDim2.new(0, 10, 0, 10)
 flingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -54,25 +55,40 @@ local corner1 = Instance.new("UICorner")
 corner1.CornerRadius = UDim.new(0, 6)
 corner1.Parent = flingButton
 
--- Botão 2: Puxar Peças do Mapa
-local partsButton = Instance.new("TextButton")
-partsButton.Size = UDim2.new(0, 160, 0, 35)
-partsButton.Position = UDim2.new(0, 10, 0, 50)
-partsButton.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
-partsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-partsButton.TextSize = 13
-partsButton.Font = Enum.Font.SourceSansBold
-partsButton.Text = "Puxar Peças: OFF"
-partsButton.Parent = mainFrame
+-- Botão 2: Todos
+local todosButton = Instance.new("TextButton")
+todosButton.Size = UDim2.new(0, 160, 0, 32)
+todosButton.Position = UDim2.new(0, 10, 0, 50)
+todosButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+todosButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+todosButton.TextSize = 13
+todosButton.Font = Enum.Font.SourceSansBold
+todosButton.Text = "Todos: DESATIVADO"
+todosButton.Parent = mainFrame
 
 local corner2 = Instance.new("UICorner")
 corner2.CornerRadius = UDim.new(0, 6)
-corner2.Parent = partsButton
+corner2.Parent = todosButton
 
--- Caixa de Texto: Alvo (Algumas letras)
+-- Botão 3: Anti-Fling
+local antiFlingButton = Instance.new("TextButton")
+antiFlingButton.Size = UDim2.new(0, 160, 0, 32)
+antiFlingButton.Position = UDim2.new(0, 10, 0, 90)
+antiFlingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+antiFlingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+antiFlingButton.TextSize = 13
+antiFlingButton.Font = Enum.Font.SourceSansBold
+antiFlingButton.Text = "Anti-Fling: OFF"
+antiFlingButton.Parent = mainFrame
+
+local corner3 = Instance.new("UICorner")
+corner3.CornerRadius = UDim.new(0, 6)
+corner3.Parent = antiFlingButton
+
+-- Caixa de Texto: Alvo (Visível apenas quando 'Todos' está OFF)
 local targetBox = Instance.new("TextBox")
-targetBox.Size = UDim2.new(0, 160, 0, 35)
-targetBox.Position = UDim2.new(0, 10, 0, 90)
+targetBox.Size = UDim2.new(0, 160, 0, 32)
+targetBox.Position = UDim2.new(0, 10, 0, 130)
 targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
@@ -82,11 +98,13 @@ targetBox.TextSize = 13
 targetBox.Font = Enum.Font.SourceSans
 targetBox.Parent = mainFrame
 
-local corner3 = Instance.new("UICorner")
-corner3.CornerRadius = UDim.new(0, 6)
-corner3.Parent = targetBox
+local corner4 = Instance.new("UICorner")
+corner4.CornerRadius = UDim.new(0, 6)
+corner4.Parent = targetBox
 
--- Eventos dos Botões
+-- ==========================================
+-- EVENTOS DOS BOTÕES
+-- ==========================================
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     if flingActive then
@@ -98,19 +116,32 @@ flingButton.MouseButton1Click:Connect(function()
     end
 end)
 
-partsButton.MouseButton1Click:Connect(function()
-    partsActive = not partsActive
-    if partsActive then
-        partsButton.Text = "Puxar Peças: ON"
-        partsButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+todosButton.MouseButton1Click:Connect(function()
+    todosActive = not todosActive
+    if todosActive then
+        todosButton.Text = "Todos: ATIVADO"
+        todosButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        targetBox.Visible = false -- Esconde a caixa de nome quando 'Todos' está ON
     else
-        partsButton.Text = "Puxar Peças: OFF"
-        partsButton.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+        todosButton.Text = "Todos: DESATIVADO"
+        todosButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        targetBox.Visible = true -- Mostra a caixa de nome quando 'Todos' está OFF
+    end
+end)
+
+antiFlingButton.MouseButton1Click:Connect(function()
+    antiFlingActive = not antiFlingActive
+    if antiFlingActive then
+        antiFlingButton.Text = "Anti-Fling: ON"
+        antiFlingButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        antiFlingButton.Text = "Anti-Fling: OFF"
+        antiFlingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 end)
 
 -- ==========================================
--- FUNÇÃO PARA ENCONTRAR O ALVO POR POUCAS LETRAS
+-- FUNÇÕES DE ALVO
 -- ==========================================
 local function getTargetPlayer()
     local query = targetBox.Text:lower()
@@ -120,7 +151,6 @@ local function getTargetPlayer()
         if player ~= LocalPlayer then
             local pName = player.Name:lower()
             local pDisp = player.DisplayName:lower()
-            -- Verifica se o texto digitado bate com o início ou contém no nome/display name
             if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
                 return player
             end
@@ -140,37 +170,22 @@ local function isValidTarget(targetChar)
 end
 
 -- ==========================================
--- LOOP 1: MANIPULAÇÃO DE PEÇAS (MAPA)
+-- LOOP: ANTI-FLING
 -- ==========================================
-task.spawn(function()
-    while true do
-        if not partsActive then
-            task.wait(0.5)
-            continue
+RunService.Stepped:Connect(function()
+    if not antiFlingActive then return end
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if root then
+        if root.AssemblyLinearVelocity.Magnitude > 300 or root.AssemblyAngularVelocity.Magnitude > 300 then
+            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
         end
-
-        local character = LocalPlayer.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-
-        if rootPart then
-            for _, item in ipairs(Workspace:GetDescendants()) do
-                if not partsActive then break end
-                if item:IsA("BasePart") and not item.Anchored and not item:IsDescendantOf(character) then
-                    if item.Size.Magnitude < 30 then
-                        pcall(function()
-                            item.CFrame = rootPart.CFrame + Vector3.new(math.random(-5, 5), 5, math.random(-5, 5))
-                            item.AssemblyLinearVelocity = Vector3.new(0, -20, 0)
-                        end)
-                    end
-                end
-            end
-        end
-        task.wait(1)
     end
 end)
 
 -- ==========================================
--- LOOP 2: MASS WALKFLING (ALVO ÚNICO + ANTI-NOCLIP FORÇADO)
+-- LOOP: FLING (MODO TODOS OU ALVO ÚNICO)
 -- ==========================================
 task.spawn(function()
     while true do
@@ -188,46 +203,87 @@ task.spawn(function()
             continue
         end
 
-        local targetPlayer = getTargetPlayer()
-        
-        -- Se houver um alvo digitado e válido
-        if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
-            local targetChar = targetPlayer.Character
-            local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-            
-            if targetRoot then
-                local startTime = tick()
-                while flingActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
-                    character = LocalPlayer.Character
-                    rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                    
-                    if not character or not rootPart then break end
-                    
-                    -- FORÇA CONTÍNIA DE COLISÃO (Anula o Noclip do outro jogador)
-                    pcall(function()
-                        targetRoot.CanCollide = true
-                        for _, part in ipairs(targetChar:GetChildren()) do
-                            if part:IsA("BasePart") then
-                                part.CanCollide = true
-                            end
-                        end
-                    end)
-                    
-                    local randomOffset = CFrame.new(
-                        math.random(-150, 150) / 100, 
-                        math.random(-50, 100) / 100, 
-                        math.random(-150, 150) / 100
-                    )
-                    rootPart.CFrame = targetRoot.CFrame * randomOffset
-                    rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
-                    rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
-                    
-                    RunService.Heartbeat:Wait()
+        if todosActive then
+            -- Fling em todos os jogadores ativos
+            local targets = {}
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and isValidTarget(player.Character) then
+                    table.insert(targets, player.Character)
                 end
             end
+
+            if #targets > 0 then
+                for _, targetChar in ipairs(targets) do
+                    if not flingActive or not todosActive then break end
+                    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                    if targetRoot and isValidTarget(targetChar) then
+                        local startTick = tick()
+                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.15) do
+                            character = LocalPlayer.Character
+                            rootPart = character and character:FindFirstChild("HumanoidRootPart")
+                            if not character or not rootPart then break end
+
+                            pcall(function()
+                                targetRoot.CanCollide = true
+                                for _, part in ipairs(targetChar:GetChildren()) do
+                                    if part:IsA("BasePart") then part.CanCollide = true end
+                                end
+                            end)
+
+                            local randomOffset = CFrame.new(
+                                math.random(-150, 150) / 100, 
+                                math.random(-50, 100) / 100, 
+                                math.random(-150, 150) / 100
+                            )
+                            rootPart.CFrame = targetRoot.CFrame * randomOffset
+                            rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+                            rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+
+                            RunService.Heartbeat:Wait()
+                        end
+                    end
+                end
+            else
+                task.wait(0.5)
+            end
         else
-            -- Se a caixa estiver vazia, avisa ou aguarda digitar
-            task.wait(0.5)
+            -- Modo Alvo Único por nome
+            local targetPlayer = getTargetPlayer()
+            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+                local targetChar = targetPlayer.Character
+                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                
+                if targetRoot then
+                    while flingActive and not todosActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                        character = LocalPlayer.Character
+                        rootPart = character and character:FindFirstChild("HumanoidRootPart")
+                        
+                        if not character or not rootPart then break end
+                        
+                        pcall(function()
+                            targetRoot.CanCollide = true
+                            for _, part in ipairs(targetChar:GetChildren()) do
+                                if part:IsA("BasePart") then
+                                    part.CanCollide = true
+                                end
+                            end
+                        end)
+                        
+                        local randomOffset = CFrame.new(
+                            math.random(-150, 150) / 100, 
+                            math.random(-50, 100) / 100, 
+                            math.random(-150, 150) / 100
+                        )
+                        rootPart.CFrame = targetRoot.CFrame * randomOffset
+                        rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+                        rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                        
+                        RunService.Heartbeat:Wait()
+                    end
+                end
+            else
+                task.wait(0.5)
+            end
         end
     end
 end)
