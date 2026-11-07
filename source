@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling + Rejoin)
+    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling + Rejoin com Persistência)
 --]]
 
 local Players = game:GetService("Players")
@@ -86,7 +86,7 @@ local corner3 = Instance.new("UICorner")
 corner3.CornerRadius = UDim.new(0, 6)
 corner3.Parent = antiFlingButton
 
--- Botão 4: Rejoin (Infinite Yield style)
+-- Botão 4: Rejoin (com queue_on_teleport)
 local rejoinButton = Instance.new("TextButton")
 rejoinButton.Size = UDim2.new(0, 160, 0, 30)
 rejoinButton.Position = UDim2.new(0, 10, 0, 124)
@@ -160,6 +160,18 @@ rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
     
+    pcall(function()
+        local queueFunction = syn and syn.queue_on_teleport or queue_on_teleport or fluxus and fluxus.queue_on_teleport
+        if queueFunction then
+            queueFunction([[
+                task.spawn(function()
+                    repeat task.wait() until game:IsLoaded()
+                    loadstring(game:HttpGet("SEU_LINK_OU_COPIA_DO_SCRIPT_AQUI"))()
+                end)
+            ]])
+        end
+    end)
+
     pcall(function()
         if #Players:GetPlayers() <= 1 then
             LocalPlayer:Kick("\nReconectando...")
