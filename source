@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos da Lava (Dano/Empurrão Real)
+    Script: Mass Walkfling + Jogar Blocos (Branco, Cinzento e Azul-Claro)[cite: 1]
 --]]
 
 local Players = game:GetService("Players")
@@ -236,7 +236,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso dos Blocos Pretos (Afetados pela Lava)
+-- Loop de Arremesso dos Blocos (Branco, Cinzento e Azul-Claro)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -270,10 +270,13 @@ task.spawn(function()
                 
                 if part:IsA("BasePart") and not part.Anchored then
                     local color = part.Color
-                    -- Identifica blocos pretos/queimados (valores RGB muito baixos)
-                    local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
                     
-                    if isBlack then
+                    -- Condições de cor atualizadas:
+                    local isWhite = color.R > 0.85 and color.G > 0.85 and color.B > 0.85
+                    local isGray = math.abs(color.R - color.G) < 0.1 and math.abs(color.G - color.B) < 0.1 and color.R > 0.2 and color.R < 0.8
+                    local isLightBlue = color.B > 0.6 and color.G > 0.4 and color.R < 0.5 and color.B > color.R
+                    
+                    if isWhite or isGray or isLightBlue then
                         local isCharacterPart = false
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p.Character and part:IsDescendantOf(p.Character) then
