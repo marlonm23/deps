@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos (Preto, Prata e Amarelo)
+    Script: Mass Walkfling + Jogar Blocos Pretos da Lava (Dano/Empurrão Realmarlon)
 --]]
 
 local Players = game:GetService("Players")
@@ -178,8 +178,6 @@ throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
-rejoinButton.MouseButton1List:Connect(function() -- mantido seguro
-end)
 rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
@@ -238,7 +236,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso (Blocos Pretos, Pratas e Amarelos que estão caindo/desancorados)
+-- Loop de Arremesso dos Blocos Pretos (Afetados pela Lava)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -272,13 +270,10 @@ task.spawn(function()
                 
                 if part:IsA("BasePart") and not part.Anchored then
                     local color = part.Color
-                    
-                    -- Filtros de cores atualizados: Preto, Prata e Amarelo
+                    -- Identifica blocos pretos/queimados (valores RGB muito baixos)
                     local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
-                    local isSilver = math.abs(color.R - color.G) < 0.1 and math.abs(color.G - color.B) < 0.1 and color.R > 0.5 and color.R < 0.85
-                    local isYellow = color.R > 0.7 and color.G > 0.7 and color.B < 0.4
                     
-                    if isBlack or isSilver or isYellow then
+                    if isBlack then
                         local isCharacterPart = false
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p.Character and part:IsDescendantOf(p.Character) then
@@ -293,7 +288,7 @@ task.spawn(function()
                                 part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
                                 
                                 local direction = (targetRoot.Position - part.Position).Unit
-                                part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
+                                part.AssemblyLinearVelocity = direction * 400 + Vector3.new(0, 60, 0)
                                 part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
                             end)
                         end
