@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos (Alvo Único / Todos + Anti-Fling + Rejoin + Invisível)
+    Script: Mass Walkfling + Jogar Blocos Pretos da Lava (Dano/Empurrão Real)
 --]]
 
 local Players = game:GetService("Players")
@@ -15,26 +15,19 @@ local antiFlingActive = false
 local invisibleActive = false
 local throwPartsActive = false
 
--- Função segura de queue_on_teleport (Padrão Infinite Yield)
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
--- ==========================================
--- LIMPEZA DE INTERFACE ANTERIOR (SE HOUVER)
--- ==========================================
 if CoreGui:FindFirstChild("MassFlingUI") then
     CoreGui.MassFlingUI:Destroy()
 end
 
--- ==========================================
--- CRIAÇÃO DA INTERFACE
--- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 285) -- Altura aumentada para caber o novo botão
+mainFrame.Size = UDim2.new(0, 180, 0, 285)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -46,7 +39,6 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Botão 1: Fling (Master)
 local flingButton = Instance.new("TextButton")
 flingButton.Size = UDim2.new(0, 160, 0, 30)
 flingButton.Position = UDim2.new(0, 10, 0, 10)
@@ -61,7 +53,6 @@ local corner1 = Instance.new("UICorner")
 corner1.CornerRadius = UDim.new(0, 6)
 corner1.Parent = flingButton
 
--- Botão 2: Todos
 local todosButton = Instance.new("TextButton")
 todosButton.Size = UDim2.new(0, 160, 0, 30)
 todosButton.Position = UDim2.new(0, 10, 0, 48)
@@ -76,7 +67,6 @@ local corner2 = Instance.new("UICorner")
 corner2.CornerRadius = UDim.new(0, 6)
 corner2.Parent = todosButton
 
--- Botão 3: Anti-Fling
 local antiFlingButton = Instance.new("TextButton")
 antiFlingButton.Size = UDim2.new(0, 160, 0, 30)
 antiFlingButton.Position = UDim2.new(0, 10, 0, 86)
@@ -91,7 +81,6 @@ local corner3 = Instance.new("UICorner")
 corner3.CornerRadius = UDim.new(0, 6)
 corner3.Parent = antiFlingButton
 
--- Botão 4: Invisível
 local invisibleButton = Instance.new("TextButton")
 invisibleButton.Size = UDim2.new(0, 160, 0, 30)
 invisibleButton.Position = UDim2.new(0, 10, 0, 124)
@@ -106,7 +95,6 @@ local corner4 = Instance.new("UICorner")
 corner4.CornerRadius = UDim.new(0, 6)
 corner4.Parent = invisibleButton
 
--- Botão 5: Rejoin
 local rejoinButton = Instance.new("TextButton")
 rejoinButton.Size = UDim2.new(0, 160, 0, 30)
 rejoinButton.Position = UDim2.new(0, 10, 0, 162)
@@ -121,7 +109,6 @@ local corner5 = Instance.new("UICorner")
 corner5.CornerRadius = UDim.new(0, 6)
 corner5.Parent = rejoinButton
 
--- Caixa de Texto: Alvo
 local targetBox = Instance.new("TextBox")
 targetBox.Size = UDim2.new(0, 160, 0, 30)
 targetBox.Position = UDim2.new(0, 10, 0, 200)
@@ -138,7 +125,6 @@ local corner6 = Instance.new("UICorner")
 corner6.CornerRadius = UDim.new(0, 6)
 corner6.Parent = targetBox
 
--- Botão 6: Jogar Blocos (Novidade)
 local throwPartsButton = Instance.new("TextButton")
 throwPartsButton.Size = UDim2.new(0, 160, 0, 30)
 throwPartsButton.Position = UDim2.new(0, 10, 0, 238)
@@ -153,42 +139,23 @@ local corner7 = Instance.new("UICorner")
 corner7.CornerRadius = UDim.new(0, 6)
 corner7.Parent = throwPartsButton
 
--- ==========================================
--- EVENTOS DOS BOTÕES
--- ==========================================
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
-    if flingActive then
-        flingButton.Text = "Fling: ATIVADO"
-        flingButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-    else
-        flingButton.Text = "Fling: DESATIVADO"
-        flingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    end
+    flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
+    flingButton.BackgroundColor3 = flingActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
 todosButton.MouseButton1Click:Connect(function()
     todosActive = not todosActive
-    if todosActive then
-        todosButton.Text = "Todos: ATIVADO"
-        todosButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        targetBox.Visible = false
-    else
-        todosButton.Text = "Todos: DESATIVADO"
-        todosButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        targetBox.Visible = true
-    end
+    todosButton.Text = todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO"
+    todosButton.BackgroundColor3 = todosActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+    targetBox.Visible = not todosActive
 end)
 
 antiFlingButton.MouseButton1Click:Connect(function()
     antiFlingActive = not antiFlingActive
-    if antiFlingActive then
-        antiFlingButton.Text = "Anti-Fling: ON"
-        antiFlingButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-    else
-        antiFlingButton.Text = "Anti-Fling: OFF"
-        antiFlingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    end
+    antiFlingButton.Text = antiFlingActive and "Anti-Fling: ON" or "Anti-Fling: OFF"
+    antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
 invisibleButton.MouseButton1Click:Connect(function()
@@ -197,55 +164,28 @@ invisibleButton.MouseButton1Click:Connect(function()
     if char then
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
-                if invisibleActive then
-                    part.Transparency = 1
-                else
-                    if part.Name == "HumanoidRootPart" then
-                        part.Transparency = 1
-                    else
-                        part.Transparency = 0
-                    end
-                end
+                part.Transparency = invisibleActive and 1 or (part.Name == "HumanoidRootPart" and 1 or 0)
             end
         end
     end
-    
-    if invisibleActive then
-        invisibleButton.Text = "Invisível: ON"
-        invisibleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-    else
-        invisibleButton.Text = "Invisível: OFF"
-        invisibleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    end
+    invisibleButton.Text = invisibleActive and "Invisível: ON" or "Invisível: OFF"
+    invisibleButton.BackgroundColor3 = invisibleActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
 throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsActive = not throwPartsActive
-    if throwPartsActive then
-        throwPartsButton.Text = "Jogar Blocos: ON"
-        throwPartsButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-    else
-        throwPartsButton.Text = "Jogar Blocos: OFF"
-        throwPartsButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    end
+    throwPartsButton.Text = throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF"
+    throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
 rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
-    
     if queueteleport then
         pcall(function()
-            queueteleport([[
-                task.spawn(function()
-                    if not game:IsLoaded() then
-                        game.Loaded:Wait()
-                    end
-                end)
-            ]])
+            queueteleport("task.spawn(function() if not game:IsLoaded() then game.Loaded:Wait() end end)")
         end)
     end
-
     pcall(function()
         if #Players:GetPlayers() <= 1 then
             LocalPlayer:Kick("\nReconectando...")
@@ -257,17 +197,12 @@ rejoinButton.MouseButton1Click:Connect(function()
     end)
 end)
 
--- ==========================================
--- FUNÇÕES DE ALVO
--- ==========================================
 local function getTargetPlayer()
     local query = targetBox.Text:lower()
     if query == "" then return nil end
-    
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
-            local pName = player.Name:lower()
-            local pDisp = player.DisplayName:lower()
+            local pName, pDisp = player.Name:lower(), player.DisplayName:lower()
             if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
                 return player
             end
@@ -280,30 +215,28 @@ local function isValidTarget(targetChar)
     if not targetChar then return false end
     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-    if not targetRoot or not humanoid or humanoid.Health <= 0 then 
-        return false 
-    end
-    return true
+    return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- ==========================================
--- LOOP: ANTI-FLING
--- ==========================================
+RunService.Heartbeat:Connect(function()
+    if throwPartsActive or flingActive then
+        pcall(function()
+            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
+        end)
+    end
+end)
+
 RunService.Stepped:Connect(function()
     if not antiFlingActive then return end
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if root then
-        if root.AssemblyLinearVelocity.Magnitude > 300 or root.AssemblyAngularVelocity.Magnitude > 300 then
-            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-        end
+    if root and (root.AssemblyLinearVelocity.Magnitude > 300 or root.AssemblyAngularVelocity.Magnitude > 300) then
+        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     end
 end)
 
--- ==========================================
--- LOOP: JOGAR BLOCOS NOS JOGADORES (ITENS DA LAVA)
--- ==========================================
+-- Loop de Arremesso dos Blocos Pretos (Afetados pela Lava)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -332,37 +265,42 @@ task.spawn(function()
         if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
             local targetRoot = targetChar.HumanoidRootPart
             
-            -- Varre o workspace procurando blocos livres/soltos (como os blocos cinzas da lava)
             for _, part in ipairs(Workspace:GetDescendants()) do
                 if not throwPartsActive then break end
+                
                 if part:IsA("BasePart") and not part.Anchored then
-                    -- Evita mexer no personagem do próprio jogador ou de outros players
-                    local isCharacterPart = false
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p.Character and part:IsDescendantOf(p.Character) then
-                            isCharacterPart = true
-                            break
+                    local color = part.Color
+                    -- Identifica blocos pretos/queimados (valores RGB muito baixos)
+                    local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
+                    
+                    if isBlack then
+                        local isCharacterPart = false
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p.Character and part:IsDescendantOf(p.Character) then
+                                isCharacterPart = true
+                                break
+                            end
                         end
-                    end
 
-                    if not isCharacterPart then
-                        pcall(function()
-                            part.CanCollide = false
-                            -- Teleporta o bloco para perto da cabeça/corpo do alvo e dá uma velocidade explosiva em direção a ele
-                            part.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), math.random(0, 4), math.random(-2, 2))
-                            part.AssemblyLinearVelocity = Vector3.new(math.random(-400, 400), 600, math.random(-400, 400))
-                        end)
+                        if not isCharacterPart then
+                            pcall(function()
+                                part.CanCollide = true
+                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                                
+                                local direction = (targetRoot.Position - part.Position).Unit
+                                part.AssemblyLinearVelocity = direction * 400 + Vector3.new(0, 60, 0)
+                                part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
+                            end)
+                        end
                     end
                 end
             end
         end
-        task.wait(0.15)
+        task.wait(0.1)
     end
 end)
 
--- ==========================================
--- LOOP: FLING (MODO TODOS OU ALVO ÚNICO)
--- ==========================================
+-- Loop Fling Padrão
 task.spawn(function()
     while true do
         if not flingActive then
@@ -431,15 +369,12 @@ task.spawn(function()
                     while flingActive and not todosActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
                         character = LocalPlayer.Character
                         rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                        
                         if not character or not rootPart then break end
                         
                         pcall(function()
                             targetRoot.CanCollide = true
                             for _, part in ipairs(targetChar:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    part.CanCollide = true
-                                end
+                                if part:IsA("BasePart") then part.CanCollide = true end
                             end
                         end)
                         
