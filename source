@@ -1,10 +1,11 @@
 --[[
-    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling por Frame)
+    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling + Rejoin)
 --]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local TeleportService = game:GetService("TeleportService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
@@ -28,7 +29,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 175)
+mainFrame.Size = UDim2.new(0, 180, 0, 215)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -42,7 +43,7 @@ uiCorner.Parent = mainFrame
 
 -- Botão 1: Fling (Master)
 local flingButton = Instance.new("TextButton")
-flingButton.Size = UDim2.new(0, 160, 0, 32)
+flingButton.Size = UDim2.new(0, 160, 0, 30)
 flingButton.Position = UDim2.new(0, 10, 0, 10)
 flingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -57,8 +58,8 @@ corner1.Parent = flingButton
 
 -- Botão 2: Todos
 local todosButton = Instance.new("TextButton")
-todosButton.Size = UDim2.new(0, 160, 0, 32)
-todosButton.Position = UDim2.new(0, 10, 0, 50)
+todosButton.Size = UDim2.new(0, 160, 0, 30)
+todosButton.Position = UDim2.new(0, 10, 0, 48)
 todosButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 todosButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 todosButton.TextSize = 13
@@ -72,8 +73,8 @@ corner2.Parent = todosButton
 
 -- Botão 3: Anti-Fling
 local antiFlingButton = Instance.new("TextButton")
-antiFlingButton.Size = UDim2.new(0, 160, 0, 32)
-antiFlingButton.Position = UDim2.new(0, 10, 0, 90)
+antiFlingButton.Size = UDim2.new(0, 160, 0, 30)
+antiFlingButton.Position = UDim2.new(0, 10, 0, 86)
 antiFlingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 antiFlingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 antiFlingButton.TextSize = 13
@@ -85,10 +86,25 @@ local corner3 = Instance.new("UICorner")
 corner3.CornerRadius = UDim.new(0, 6)
 corner3.Parent = antiFlingButton
 
+-- Botão 4: Rejoin (Infinite Yield style)
+local rejoinButton = Instance.new("TextButton")
+rejoinButton.Size = UDim2.new(0, 160, 0, 30)
+rejoinButton.Position = UDim2.new(0, 10, 0, 124)
+rejoinButton.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+rejoinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+rejoinButton.TextSize = 13
+rejoinButton.Font = Enum.Font.SourceSansBold
+rejoinButton.Text = "Rejoin"
+rejoinButton.Parent = mainFrame
+
+local corner4 = Instance.new("UICorner")
+corner4.CornerRadius = UDim.new(0, 6)
+corner4.Parent = rejoinButton
+
 -- Caixa de Texto: Alvo (Visível apenas quando 'Todos' está OFF)
 local targetBox = Instance.new("TextBox")
-targetBox.Size = UDim2.new(0, 160, 0, 32)
-targetBox.Position = UDim2.new(0, 10, 0, 130)
+targetBox.Size = UDim2.new(0, 160, 0, 30)
+targetBox.Position = UDim2.new(0, 10, 0, 164)
 targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
@@ -98,9 +114,9 @@ targetBox.TextSize = 13
 targetBox.Font = Enum.Font.SourceSans
 targetBox.Parent = mainFrame
 
-local corner4 = Instance.new("UICorner")
-corner4.CornerRadius = UDim.new(0, 6)
-corner4.Parent = targetBox
+local corner5 = Instance.new("UICorner")
+corner5.CornerRadius = UDim.new(0, 6)
+corner5.Parent = targetBox
 
 -- ==========================================
 -- EVENTOS DOS BOTÕES
@@ -121,11 +137,11 @@ todosButton.MouseButton1Click:Connect(function()
     if todosActive then
         todosButton.Text = "Todos: ATIVADO"
         todosButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        targetBox.Visible = false -- Esconde a caixa de nome quando 'Todos' está ON
+        targetBox.Visible = false
     else
         todosButton.Text = "Todos: DESATIVADO"
         todosButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        targetBox.Visible = true -- Mostra a caixa de nome quando 'Todos' está OFF
+        targetBox.Visible = true
     end
 end)
 
@@ -138,6 +154,21 @@ antiFlingButton.MouseButton1Click:Connect(function()
         antiFlingButton.Text = "Anti-Fling: OFF"
         antiFlingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
+end)
+
+rejoinButton.MouseButton1Click:Connect(function()
+    rejoinButton.Text = "Reconectando..."
+    rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+    
+    pcall(function()
+        if #Players:GetPlayers() <= 1 then
+            LocalPlayer:Kick("\nReconectando...")
+            task.wait()
+            TeleportService:Teleport(game.PlaceId, LocalPlayer)
+        else
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+        end
+    end)
 end)
 
 -- ==========================================
@@ -204,7 +235,6 @@ task.spawn(function()
         end
 
         if todosActive then
-            -- Fling em todos os jogadores ativos
             local targets = {}
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character and isValidTarget(player.Character) then
@@ -247,7 +277,6 @@ task.spawn(function()
                 task.wait(0.5)
             end
         else
-            -- Modo Alvo Único por nome
             local targetPlayer = getTargetPlayer()
             if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
                 local targetChar = targetPlayer.Character
