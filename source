@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling (Alvo Único / Todos + Anti-Fling + Rejoin + Invisível)
+    Script: Mass Walkfling + Jogar Blocos (Alvo Único / Todos + Anti-Fling + Rejoin + Invisível)
 --]]
 
 local Players = game:GetService("Players")
@@ -13,6 +13,7 @@ local flingActive = false
 local todosActive = false
 local antiFlingActive = false
 local invisibleActive = false
+local throwPartsActive = false
 
 -- Função segura de queue_on_teleport (Padrão Infinite Yield)
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
@@ -33,7 +34,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 255)
+mainFrame.Size = UDim2.new(0, 180, 0, 285) -- Altura aumentada para caber o novo botão
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -120,10 +121,10 @@ local corner5 = Instance.new("UICorner")
 corner5.CornerRadius = UDim.new(0, 6)
 corner5.Parent = rejoinButton
 
--- Caixa de Texto: Alvo (Visível apenas quando 'Todos' está OFF)
+-- Caixa de Texto: Alvo
 local targetBox = Instance.new("TextBox")
 targetBox.Size = UDim2.new(0, 160, 0, 30)
-targetBox.Position = UDim2.new(0, 10, 0, 202)
+targetBox.Position = UDim2.new(0, 10, 0, 200)
 targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
@@ -136,6 +137,21 @@ targetBox.Parent = mainFrame
 local corner6 = Instance.new("UICorner")
 corner6.CornerRadius = UDim.new(0, 6)
 corner6.Parent = targetBox
+
+-- Botão 6: Jogar Blocos (Novidade)
+local throwPartsButton = Instance.new("TextButton")
+throwPartsButton.Size = UDim2.new(0, 160, 0, 30)
+throwPartsButton.Position = UDim2.new(0, 10, 0, 238)
+throwPartsButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+throwPartsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+throwPartsButton.TextSize = 13
+throwPartsButton.Font = Enum.Font.SourceSansBold
+throwPartsButton.Text = "Jogar Blocos: OFF"
+throwPartsButton.Parent = mainFrame
+
+local corner7 = Instance.new("UICorner")
+corner7.CornerRadius = UDim.new(0, 6)
+corner7.Parent = throwPartsButton
 
 -- ==========================================
 -- EVENTOS DOS BOTÕES
@@ -200,6 +216,17 @@ invisibleButton.MouseButton1Click:Connect(function()
     else
         invisibleButton.Text = "Invisível: OFF"
         invisibleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+throwPartsButton.MouseButton1Click:Connect(function()
+    throwPartsActive = not throwPartsActive
+    if throwPartsActive then
+        throwPartsButton.Text = "Jogar Blocos: ON"
+        throwPartsButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        throwPartsButton.Text = "Jogar Blocos: OFF"
+        throwPartsButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 end)
 
@@ -271,6 +298,65 @@ RunService.Stepped:Connect(function()
             root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
         end
+    end
+end)
+
+-- ==========================================
+-- LOOP: JOGAR BLOCOS NOS JOGADORES (ITENS DA LAVA)
+-- ==========================================
+task.spawn(function()
+    while true do
+        if not throwPartsActive then
+            task.wait(0.2)
+            continue
+        end
+
+        local targetChar = nil
+        if todosActive then
+            local validPlayers = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
+                    table.insert(validPlayers, p.Character)
+                end
+            end
+            if #validPlayers > 0 then
+                targetChar = validPlayers[math.random(1, #validPlayers)]
+            end
+        else
+            local targetPlayer = getTargetPlayer()
+            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+                targetChar = targetPlayer.Character
+            end
+        end
+
+        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+            local targetRoot = targetChar.HumanoidRootPart
+            
+            -- Varre o workspace procurando blocos livres/soltos (como os blocos cinzas da lava)
+            for _, part in ipairs(Workspace:GetDescendants()) do
+                if not throwPartsActive then break end
+                if part:IsA("BasePart") and not part.Anchored then
+                    -- Evita mexer no personagem do próprio jogador ou de outros players
+                    local isCharacterPart = false
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p.Character and part:IsDescendantOf(p.Character) then
+                            isCharacterPart = true
+                            break
+                        end
+                    end
+
+                    if not isCharacterPart then
+                        pcall(function()
+                            part.CanCollide = false
+                            -- Teleporta o bloco para perto da cabeça/corpo do alvo e dá uma velocidade explosiva em direção a ele
+                            part.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), math.random(0, 4), math.random(-2, 2))
+                            part.AssemblyLinearVelocity = Vector3.new(math.random(-400, 400), 600, math.random(-400, 400))
+                        end)
+                    end
+                end
+            end
+        end
+        task.wait(0.15)
     end
 end)
 
