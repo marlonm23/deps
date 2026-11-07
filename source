@@ -1,0 +1,488 @@
+--[[
+    Script Completo: Mass Walkfling, Anti-Fling, Fly, Alvo/Atacar Todos & Aba de Buffs/Debuffs
+--]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local flingActive = false
+local partsActive = false
+local antiFlingActive = false
+local attackAllActive = true -- Inicia atacando todos por padrão
+local flyActive = false
+local buffsActive = false
+
+-- ==========================================
+-- LIMPEZA DE INTERFACE ANTERIOR (SE HOUVER)
+-- ==========================================
+if CoreGui:FindFirstChild("MassFlingUI") then
+    CoreGui.MassFlingUI:Destroy()
+end
+
+-- ==========================================
+-- CRIAÇÃO DA INTERFACE (PAINEL COM ABAS)
+-- ==========================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MassFlingUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = CoreGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 220, 0, 260)
+mainFrame.Position = UDim2.new(0, 50, 0, 50)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = mainFrame
+
+-- Botões de Abas (Topo)
+local tab1Btn = Instance.new("TextButton")
+tab1Btn.Size = UDim2.new(0, 105, 0, 25)
+tab1Btn.Position = UDim2.new(0, 5, 0, 5)
+tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tab1Btn.TextSize = 12
+tab1Btn.Font = Enum.Font.SourceSansBold
+tab1Btn.Text = "Principal"
+tab1Btn.Parent = mainFrame
+
+local tab2Btn = Instance.new("TextButton")
+tab2Btn.Size = UDim2.new(0, 105, 0, 25)
+tab2Btn.Position = UDim2.new(0, 110, 0, 5)
+tab2Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+tab2Btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+tab2Btn.TextSize = 12
+tab2Btn.Font = Enum.Font.SourceSansBold
+tab2Btn.Text = "Buffs / Debuffs"
+tab2Btn.Parent = mainFrame
+
+-- Container Aba 1 (Principal)
+local container1 = Instance.new("Frame")
+container1.Size = UDim2.new(0, 210, 0, 215)
+container1.Position = UDim2.new(0, 5, 0, 35)
+container1.BackgroundTransparency = 1
+container1.Visible = true
+container1.Parent = mainFrame
+
+-- Container Aba 2 (Buffs)
+local container2 = Instance.new("Frame")
+container2.Size = UDim2.new(0, 210, 0, 215)
+container2.Position = UDim2.new(0, 5, 0, 35)
+container2.BackgroundTransparency = 1
+container2.Visible = false
+container2.Parent = mainFrame
+
+-- --- ELEMENTOS DA ABA 1 ---
+local flingButton = Instance.new("TextButton")
+flingButton.Size = UDim2.new(0, 200, 0, 30)
+flingButton.Position = UDim2.new(0, 5, 0, 5)
+flingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flingButton.TextSize = 12
+flingButton.Font = Enum.Font.SourceSansBold
+flingButton.Text = "Fling: DESATIVADO"
+flingButton.Parent = container1
+
+local attackAllButton = Instance.new("TextButton")
+attackAllButton.Size = UDim2.new(0, 200, 0, 25)
+attackAllButton.Position = UDim2.new(0, 5, 0, 40)
+attackAllButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+attackAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+attackAllButton.TextSize = 11
+attackAllButton.Font = Enum.Font.SourceSansBold
+attackAllButton.Text = "Modo: Atacar Todos (ON)"
+attackAllButton.Parent = container1
+
+local targetBox = Instance.new("TextBox")
+targetBox.Size = UDim2.new(0, 200, 0, 25)
+targetBox.Position = UDim2.new(0, 5, 0, 70)
+targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+targetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
+targetBox.PlaceholderText = "Digite parte do nome..."
+targetBox.Text = ""
+targetBox.TextSize = 11
+targetBox.Font = Enum.Font.SourceSans
+targetBox.Visible = false -- Como Atacar Todos inicia ligado, fica oculta
+targetBox.Parent = container1
+
+local partsButton = Instance.new("TextButton")
+partsButton.Size = UDim2.new(0, 200, 0, 25)
+partsButton.Position = UDim2.new(0, 5, 0, 100)
+partsButton.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+partsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+partsButton.TextSize = 11
+partsButton.Font = Enum.Font.SourceSansBold
+partsButton.Text = "Puxar Peças: OFF"
+partsButton.Parent = container1
+
+local antiFlingButton = Instance.new("TextButton")
+antiFlingButton.Size = UDim2.new(0, 200, 0, 25)
+antiFlingButton.Position = UDim2.new(0, 5, 0, 130)
+antiFlingButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+antiFlingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+antiFlingButton.TextSize = 11
+antiFlingButton.Font = Enum.Font.SourceSansBold
+antiFlingButton.Text = "Anti-Fling: OFF"
+antiFlingButton.Parent = container1
+
+local flyButton = Instance.new("TextButton")
+flyButton.Size = UDim2.new(0, 200, 0, 25)
+flyButton.Position = UDim2.new(0, 5, 0, 160)
+flyButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+flyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyButton.TextSize = 11
+flyButton.Font = Enum.Font.SourceSansBold
+flyButton.Text = "Fly (Voar): OFF"
+flyButton.Parent = container1
+
+-- --- ELEMENTOS DA ABA 2 (BUFFS / DEBUFFS) ---
+local buffsToggleButton = Instance.new("TextButton")
+buffsToggleButton.Size = UDim2.new(0, 200, 0, 30)
+buffsToggleButton.Position = UDim2.new(0, 5, 0, 10)
+buffsToggleButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+buffsToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+buffsToggleButton.TextSize = 12
+buffsToggleButton.Font = Enum.Font.SourceSansBold
+buffsToggleButton.Text = "Ativar Buffs Customizados: OFF"
+buffsToggleButton.Parent = container2
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0, 200, 0, 140)
+statusLabel.Position = UDim2.new(0, 5, 0, 50)
+statusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.TextSize = 11
+statusLabel.Font = Enum.Font.Code
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.TextYAlignment = Enum.TextYAlignment.Top
+statusLabel.TextWrapped = true
+statusLabel.Text = "\n [ STATUS ATUAL ]\n\n• Velocidade: Normal\n• Pulo: Normal\n• Estado: Sem Buffs\n• Anti-Fling: Inativo"
+statusLabel.Parent = container2
+
+-- ==========================================
+-- CONTROLE DE ABAS
+-- ==========================================
+tab1Btn.MouseButton1Click:Connect(function()
+    container1.Visible = true
+    container2.Visible = false
+    tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab2Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    tab2Btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+end)
+
+tab2Btn.MouseButton1Click:Connect(function()
+    container1.Visible = false
+    container2.Visible = true
+    tab2Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    tab2Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab1Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    tab1Btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+end)
+
+-- ==========================================
+-- EVENTOS DOS BOTÕES PRINCIPAIS
+-- ==========================================
+flingButton.MouseButton1Click:Connect(function()
+    flingActive = not flingActive
+    if flingActive then
+        flingButton.Text = "Fling: ATIVADO"
+        flingButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        flingButton.Text = "Fling: DESATIVADO"
+        flingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+attackAllButton.MouseButton1Click:Connect(function()
+    attackAllActive = not attackAllActive
+    if attackAllActive then
+        attackAllButton.Text = "Modo: Atacar Todos (ON)"
+        attackAllButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        targetBox.Visible = false -- Some com a caixa de texto
+    else
+        attackAllButton.Text = "Modo: Alvo Específico (OFF)"
+        attackAllButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+        targetBox.Visible = true -- Mostra a caixa de texto
+    end
+end)
+
+partsButton.MouseButton1Click:Connect(function()
+    partsActive = not partsActive
+    if partsActive then
+        partsButton.Text = "Puxar Peças: ON"
+        partsButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        partsButton.Text = "Puxar Peças: OFF"
+        partsButton.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+    end
+end)
+
+antiFlingButton.MouseButton1Click:Connect(function()
+    antiFlingActive = not antiFlingActive
+    if antiFlingActive then
+        antiFlingButton.Text = "Anti-Fling: ON"
+        antiFlingButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        antiFlingButton.Text = "Anti-Fling: OFF"
+        antiFlingButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end)
+
+flyButton.MouseButton1Click:Connect(function()
+    flyActive = not flyActive
+    if flyActive then
+        flyButton.Text = "Fly (Voar): ON"
+        flyButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        flyButton.Text = "Fly (Voar): OFF"
+        flyButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end)
+
+buffsToggleButton.MouseButton1Click:Connect(function()
+    buffsActive = not buffsActive
+    if buffsActive then
+        buffsToggleButton.Text = "Ativar Buffs Customizados: ON"
+        buffsToggleButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    else
+        buffsToggleButton.Text = "Ativar Buffs Customizados: OFF"
+        buffsToggleButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+    end
+end)
+
+-- ==========================================
+-- FUNÇÕES DE SUPORTE E LÓGICA DE JOGO
+-- ==========================================
+
+local function getTargetPlayer()
+    if attackAllActive then return nil end
+    local query = targetBox.Text:lower()
+    if query == "" then return nil end
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local pName = player.Name:lower()
+            local pDisp = player.DisplayName:lower()
+            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
+                return player
+            end
+        end
+    end
+    return nil
+end
+
+local function isValidTarget(targetChar)
+    if not targetChar then return false end
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+    if not targetRoot or not humanoid or humanoid.Health <= 0 then 
+        return false 
+    end
+    return true
+end
+
+-- ==========================================
+-- LOOP 1: ANTI-FLING E BUFFS / DEBUFFS MONITOR
+-- ==========================================
+RunService.Heartbeat:Connect(function()
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    
+    -- Lógica do Anti-Fling
+    if antiFlingActive and rootPart then
+        if rootPart.AssemblyLinearVelocity.Magnitude > 300 or rootPart.AssemblyAngularVelocity.Magnitude > 300 then
+            rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+    
+    -- Lógica dos Buffs Customizados (Aba 2)
+    if humanoid then
+        if buffsActive then
+            humanoid.WalkSpeed = 24 -- Buff de Velocidade
+            humanoid.JumpPower = 60 -- Buff de Pulo
+            statusLabel.Text = "\n [ STATUS ATUAL ]\n\n• Velocidade: 24 (BUFF)\n• Pulo: 60 (BUFF)\n• Estado: Ativo\n• Anti-Fling: " .. (antiFlingActive and "Ativo" else "Inativo")
+        else
+            humanoid.WalkSpeed = 16 -- Padrão
+            humanoid.JumpPower = 50 -- Padrão
+            statusLabel.Text = "\n [ STATUS ATUAL ]\n\n• Velocidade: Normal (16)\n• Pulo: Normal (50)\n• Estado: Sem Buffs\n• Anti-Fling: " .. (antiFlingActive and "Ativo" else "Inativo")
+        end
+    end
+end)
+
+-- ==========================================
+-- LOOP 2: FLY (VOAR)
+-- ==========================================
+task.spawn(function()
+    local bodyVel, bodyGyro
+    while true do
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if flyActive and rootPart then
+            if not rootPart:FindFirstChild("FlyVelocity") then
+                bodyVel = Instance.new("BodyVelocity")
+                bodyVel.Name = "FlyVelocity"
+                bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bodyVel.Velocity = Vector3.new(0, 0, 0)
+                bodyVel.Parent = rootPart
+                
+                bodyGyro = Instance.new("BodyGyro")
+                bodyGyro.Name = "FlyGyro"
+                bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bodyGyro.CFrame = rootPart.CFrame
+                bodyGyro.Parent = rootPart
+            end
+            
+            local camera = Workspace.CurrentCamera
+            local moveDir = Vector3.new(0, 0, 0)
+            
+            -- Controles básicos de voo
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                moveDir = moveDir + camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                moveDir = moveDir - camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                moveDir = moveDir - camera.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                moveDir = moveDir + camera.CFrame.RightVector
+            end
+            
+            bodyVel.Velocity = moveDir * 50
+            bodyGyro.CFrame = camera.CFrame
+        else
+            if rootPart then
+                local bv = rootPart:FindFirstChild("FlyVelocity")
+                local bg = rootPart:FindFirstChild("FlyGyro")
+                if bv then bv:Destroy() end
+                if bg then bg:Destroy() end
+            end
+        end
+        task.wait()
+    end
+end)
+
+-- ==========================================
+-- LOOP 3: MANIPULAÇÃO DE PEÇAS (MAPA)
+-- ==========================================
+task.spawn(function()
+    while true do
+        if not partsActive then
+            task.wait(0.5)
+            continue
+        end
+
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+        if rootPart then
+            for _, item in ipairs(Workspace:GetDescendants()) do
+                if not partsActive then break end
+                if item:IsA("BasePart") and not item.Anchored and not item:IsDescendantOf(character) then
+                    if item.Size.Magnitude < 30 then
+                        pcall(function()
+                            item.CFrame = rootPart.CFrame + Vector3.new(math.random(-5, 5), 5, math.random(-5, 5))
+                            item.AssemblyLinearVelocity = Vector3.new(0, -20, 0)
+                        end)
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- ==========================================
+-- LOOP 4: MASS WALKFLING (ATACAR TODOS OU ALVO)
+-- ==========================================
+task.spawn(function()
+    while true do
+        if not flingActive then
+            task.wait(0.2)
+            continue
+        end
+
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if not rootPart or not humanoid or humanoid.Health <= 0 then
+            task.wait(0.5)
+            continue
+        end
+
+        local targets = {}
+        
+        if attackAllActive then
+            -- Ataca todos os jogadores válidos no servidor
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and isValidTarget(player.Character) then
+                    table.insert(targets, player)
+                end
+            end
+        else
+            -- Ataca apenas o alvo específico buscado pela caixa de texto
+            local targetPlayer = getTargetPlayer()
+            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+                table.insert(targets, targetPlayer)
+            end
+        end
+
+        if #targets > 0 then
+            for _, targetPlayer in ipairs(targets) do
+                if not flingActive then break end
+                
+                local startTime = tick()
+                while flingActive and isValidTarget(targetPlayer.Character) do
+                    character = LocalPlayer.Character
+                    rootPart = character and character:FindFirstChild("HumanoidRootPart")
+                    
+                    if not character or not rootPart then break end
+                    
+                    local targetChar = targetPlayer.Character
+                    local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                    
+                    if targetRoot then
+                        pcall(function()
+                            targetRoot.CanCollide = true
+                            for _, part in ipairs(targetChar:GetChildren()) do
+                                if part:IsA("BasePart") then part.CanCollide = true end
+                            end
+                        end)
+                        
+                        local randomOffset = CFrame.new(
+                            math.random(-150, 150) / 100, 
+                            math.random(-50, 100) / 100, 
+                            math.random(-150, 150) / 100
+                        )
+                        rootPart.CFrame = targetRoot.CFrame * randomOffset
+                        rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+                        rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                    else
+                        break
+                    end
+                    
+                    RunService.Heartbeat:Wait()
+                    if tick() - startTime > 0.3 then break end -- Alterna entre alvos se for "Atacar Todos"
+                end
+            end
+        else
+            task.wait(0.5)
+        end
+    end
+end)
