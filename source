@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos da Lava (Dano/Empurrão Real)
+    Script: Mass Walkfling + Jogar Blocos de Madeira (Dano/Empurrão Real)
 --]]
 
 local Players = game:GetService("Players")
@@ -132,7 +132,7 @@ throwPartsButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 throwPartsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 throwPartsButton.TextSize = 13
 throwPartsButton.Font = Enum.Font.SourceSansBold
-throwPartsButton.Text = "Jogar Blocos: OFF"
+throwPartsButton.Text = "Jogar Madeira: OFF"
 throwPartsButton.Parent = mainFrame
 
 local corner7 = Instance.new("UICorner")
@@ -174,7 +174,7 @@ end)
 
 throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsActive = not throwPartsActive
-    throwPartsButton.Text = throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF"
+    throwPartsButton.Text = throwPartsActive and "Jogar Madeira: ON" or "Jogar Madeira: OFF"
     throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
@@ -236,7 +236,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso dos Blocos Pretos (Afetados pela Lava)
+-- Loop de Arremesso dos Blocos de Madeira (Baseado na textura/cor fornecida)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -270,10 +270,13 @@ task.spawn(function()
                 
                 if part:IsA("BasePart") and not part.Anchored then
                     local color = part.Color
-                    -- Identifica blocos pretos/queimados (valores RGB muito baixos)
-                    local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
+                    local material = part.Material
                     
-                    if isBlack then
+                    -- Identifica blocos de madeira/castanhos com base nos tons da imagem enviada
+                    local isWoodColor = (color.R > 0.35 and color.R < 0.85) and (color.G > 0.15 and color.G < 0.55) and (color.B < 0.3)
+                    local isWoodMaterial = (material == Enum.Material.Wood or material == Enum.Material.WoodPlanks)
+                    
+                    if isWoodColor or isWoodMaterial then
                         local isCharacterPart = false
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p.Character and part:IsDescendantOf(p.Character) then
