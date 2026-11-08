@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin (Bypass Perfil Fechado)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Avatar Matcher (Bypass Perfil Fechado)
 --]]
 
 local Players = game:GetService("Players")
@@ -209,7 +209,7 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar)
+-- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar por Avatar Matcher)
 local filterBox = Instance.new("TextBox")
 filterBox.Size = UDim2.new(1, 0, 0, 28)
 filterBox.Position = UDim2.new(0, 0, 0, 0)
@@ -246,12 +246,12 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para contornar perfil fechado buscando o ID exato pelo username caso necessário
+-- Função de Rastreio com Avatar Matcher (Bypass de Perfil Fechado por Comparação de Miniaturas)
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
 
     local originalText = "Localizar"
-    btnLabel.Text = "🔄 Buscando..."
+    btnLabel.Text = "🔄 Varrendo Avatares..."
     btnLabel.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 
     task.defer(function()
@@ -274,51 +274,93 @@ local function trackAndTeleport(userId, btnLabel)
             return
         end
 
-        -- Tenta consultar a presença normal
-        local success, res = pcall(function()
-            local body = HttpService:JSONEncode({ userIds = { userId } })
-            return reqFunc({
-                Url = "https://presence.roproxy.com/v1/presence/users",
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = body
-            })
-        end)
+        -- 1. Pega a URL do headshot do avatar do alvo
+        local headshotUrl = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId)
+        local headshotRes = pcall(function() return reqFunc({ Url = headshotUrl, Method = "GET" }) end)
+        
+        if not headshotRes then
+            btnLabel.Text = "⚠️ Erro na API"
+            task.wait(2)
+            btnLabel.Text = originalText
+            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+            return
+        end
 
-        if success and res and res.Body then
-            local decodeOk, responseData = pcall(function()
-                return HttpService:JSONDecode(res.Body)
-            end)
+        local headshotData = HttpService:JSONDecode(headshotRes)
+        if not headshotData.data or #headshotData.data == 0 then
+            btnLabel.Text = "⚠️ Alvo sem Avatar"
+            task.wait(2)
+            btnLabel.Text = originalText
+            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+            return
+        end
 
-            if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
-                local presence = responseData.userPresences[1]
-                if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
-                    btnLabel.Text = "🚀 Entrando..."
-                    btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
-                    saveStateAndTeleport(function()
-                        TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
-                    end)
-                    return
+        local targetImageUrl = headshotData.data[1].imageUrl
+
+        -- 2. Varre os servidores públicos em busca do match da imagem do avatar
+        local cursor = ""
+        local foundJobId = nil
+
+        for page = 1, 8 do
+            local serverApiUrl = string.format("https://games.roproxy.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", game.PlaceId, cursor ~= "" and "&cursor="..cursor or "")
+            local serverRes = pcall(function() return reqFunc({ Url = serverApiUrl, Method = "GET" }) end)
+            
+            if serverRes then
+                local serverData = HttpService:JSONDecode(serverRes)
+                if serverData and serverData.data then
+                    for _, server in ipairs(serverData.data) do
+                        if server.playerTokens and #server.playerTokens > 0 then
+                            local tokenList = {}
+                            for _, token in ipairs(server.playerTokens) do
+                                table.insert(tokenList, { token = token, type = "AvatarHeadshot", size = "150x150" })
+                            end
+                            
+                            local batchRes = pcall(function()
+                                return reqFunc({
+                                    Url = "https://thumbnails.roproxy.com/v1/batch",
+                                    Method = "POST",
+                                    Headers = { ["Content-Type"] = "application/json" },
+                                    Body = HttpService:JSONEncode(tokenList)
+                                })
+                            end)
+
+                            if batchRes then
+                                local batchData = HttpService:JSONDecode(batchRes)
+                                if batchData and batchData.data then
+                                    for _, item in ipairs(batchData.data) do
+                                        if item.imageUrl == targetImageUrl then
+                                            foundJobId = server.id
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if foundJobId then break end
+                    end
+
+                    if foundJobId or not serverData.nextPageCursor then break end
+                    cursor = serverData.nextPageCursor
+                else
+                    break
                 end
+            else
+                break
             end
+            task.wait(0.2)
         end
 
-        -- Fallback agressivo para perfil fechado/privado: Força varredura na API de avatares/perfil público se o presence falhar
-        local fallbackSuccess, fallbackRes = pcall(function()
-            return reqFunc({
-                Url = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId),
-                Method = "GET"
-            })
-        end)
-
-        if fallbackSuccess then
-            btnLabel.Text = "🔒 Perfil Restrito"
-            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 80, 40)
-        else
-            btnLabel.Text = "⚠️ Inalcançável"
-            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        if foundJobId then
+            btnLabel.Text = "🚀 Entrando..."
+            btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+            saveStateAndTeleport(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, foundJobId, LocalPlayer)
+            end)
+            return
         end
 
+        btnLabel.Text = "⚠️ Não Encontrado"
+        btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
         task.wait(2.5)
         btnLabel.Text = originalText
         btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
@@ -521,55 +563,6 @@ local function isValidTarget(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     return targetRoot and humanoid and humanoid.Health > 0
 end
-
--- AUTO-REJOIN SEGURO PARA ALVO DIGITADO
-task.spawn(function()
-    task.wait(8)
-    while true do
-        task.wait(3.0)
-        pcall(function()
-            if (flingActive or throwPartsActive) and not todosActive then
-                local query = targetBox.Text:lower()
-                if query ~= "" and #query >= 2 then
-                    local targetInServer = false
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer then
-                            local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
-                            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
-                                targetInServer = true
-                                break
-                            end
-                        end
-                    end
-
-                    if not targetInServer then
-                        task.wait(3.0)
-                        local currentQuery = targetBox.Text:lower()
-                        if currentQuery == query then
-                            local doubleCheck = false
-                            for _, p in ipairs(Players:GetPlayers()) do
-                                if p ~= LocalPlayer then
-                                    local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
-                                    if pName:sub(1, #currentQuery) == currentQuery or pDisp:sub(1, #currentQuery) == currentQuery or pName:find(currentQuery) or pDisp:find(currentQuery) then
-                                        doubleCheck = true
-                                        break
-                                    end
-                                end
-                            end
-
-                            if not doubleCheck then
-                                saveStateAndTeleport(function()
-                                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-                                end)
-                                return
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-end)
 
 -- ANTI-FLING
 RunService.Heartbeat:Connect(function()
