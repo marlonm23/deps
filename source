@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos (Really Black) + Rejoin Mesmo Servidor
+    Script: Mass Walkfling + Jogar Blocos (Cores da Aba 2) + Rejoin Mesmo Servidor
 --]]
 
 local Players = game:GetService("Players")
@@ -291,46 +291,46 @@ clearColorsButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Rastreador de Cores de Blocos (Aba 2)
+-- Tabela global para armazenar as cores que aparecem na aba 2
 local loggedColors = {}
+
+-- Rastreador de Cores de Blocos (Aba 2)
 task.spawn(function()
     while true do
         task.wait(1)
-        if tab2Content.Visible then
-            pcall(function()
-                for _, part in ipairs(Workspace:GetDescendants()) do
-                    if part:IsA("BasePart") and not part.Anchored then
-                        local isChar = false
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p.Character and part:IsDescendantOf(p.Character) then
-                                isChar = true
-                                break
-                            end
+        pcall(function()
+            for _, part in ipairs(Workspace:GetDescendants()) do
+                if part:IsA("BasePart") and not part.Anchored then
+                    local isChar = false
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p.Character and part:IsDescendantOf(p.Character) then
+                            isChar = true
+                            break
                         end
+                    end
 
-                        if not isChar then
-                            local bColor = tostring(part.BrickColor)
-                            local color3 = part.Color
-                            local colorKey = bColor .. string.format(" (R:%d G:%d B:%d)", math.floor(color3.R*255), math.floor(color3.G*255), math.floor(color3.B*255))
+                    if not isChar then
+                        local bColor = tostring(part.BrickColor)
+                        local color3 = part.Color
+                        local colorKey = bColor .. string.format(" (R:%d G:%d B:%d)", math.floor(color3.R*255), math.floor(color3.G*255), math.floor(color3.B*255))
+                        
+                        if not loggedColors[colorKey] then
+                            loggedColors[colorKey] = true
                             
-                            if not loggedColors[colorKey] then
-                                loggedColors[colorKey] = true
-                                
-                                local colorLabel = Instance.new("TextLabel")
-                                colorLabel.Size = UDim2.new(1, -10, 0, 22)
-                                colorLabel.BackgroundTransparency = 1
-                                colorLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-                                colorLabel.TextSize = 11
-                                colorLabel.Font = Enum.Font.Code
-                                colorLabel.TextXAlignment = Enum.TextXAlignment.Left
-                                colorLabel.Text = colorKey
-                                colorLabel.Parent = colorsScroll
-                            end
+                            local colorLabel = Instance.new("TextLabel")
+                            colorLabel.Size = UDim2.new(1, -10, 0, 22)
+                            colorLabel.BackgroundTransparency = 1
+                            colorLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+                            colorLabel.TextSize = 11
+                            colorLabel.Font = Enum.Font.Code
+                            colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+                            colorLabel.Text = colorKey
+                            colorLabel.Parent = colorsScroll
                         end
                     end
                 end
-            end)
-        end
+            end
+        end)
     end
 end)
 
@@ -352,7 +352,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso (Filtrando apenas blocos "Really Black" / R:0 G:0 B:0)
+-- Loop de Arremesso (Move qualquer cor que apareceu e foi registrada na Aba 2)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -394,12 +394,12 @@ task.spawn(function()
                     end
 
                     if not isCharacterPart then
-                        -- Filtro para a cor Really Black (R:0, G:0, B:0 ou BrickColor "Really black")
-                        local bColor = part.BrickColor
-                        local c3 = part.Color
-                        local isReallyBlack = (bColor == BrickColor.new("Really black")) or (math.round(c3.R * 255) == 0 and math.round(c3.G * 255) == 0 and math.round(c3.B * 255) == 0)
+                        local bColor = tostring(part.BrickColor)
+                        local color3 = part.Color
+                        local colorKey = bColor .. string.format(" (R:%d G:%d B:%d)", math.floor(color3.R*255), math.floor(color3.G*255), math.floor(color3.B*255))
 
-                        if isReallyBlack then
+                        -- Move se a cor já apareceu e está registrada na lista da aba 2
+                        if loggedColors[colorKey] then
                             pcall(function()
                                 part.CanCollide = true
                                 part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
