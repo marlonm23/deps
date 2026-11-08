@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Fast Server Hop + Auto-Reset Cajado de Vinhas (UI Profissional)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Fast Server Hop (Otimizado) + Auto-Reset Cajado de Vinhas
 --]]
 
 local Players = game:GetService("Players")
@@ -91,7 +91,6 @@ topBar.BorderSizePixel = 0
 topBar.Parent = mainFrame
 Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 10)
 
--- Correção visual para os cantos inferiores da topbar
 local fixCover = Instance.new("Frame")
 fixCover.Size = UDim2.new(1, 0, 0, 5)
 fixCover.Position = UDim2.new(0, 0, 1, -5)
@@ -157,7 +156,7 @@ tab2Content.BackgroundTransparency = 1
 tab2Content.Visible = false
 tab2Content.Parent = mainFrame
 
--- Alternar Abas com animação de cor suave
+-- Alternar Abas
 tab1Btn.MouseButton1Click:Connect(function()
     tab1Content.Visible = true
     tab2Content.Visible = false
@@ -228,7 +227,7 @@ searchDesc.TextColor3 = Color3.fromRGB(180, 180, 190)
 searchDesc.TextSize = 11
 searchDesc.Font = Enum.Font.SourceSans
 searchDesc.TextWrapped = true
-searchDesc.Text = "Digite o nome do jogador para o bot varrer servidores instantaneamente:"
+searchDesc.Text = "Digite o nome do jogador para varrer múltiplos servidores rapidamente:"
 searchDesc.Parent = tab2Content
 
 local searchTargetBox = Instance.new("TextBox")
@@ -385,10 +384,10 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- Varredura ultrarrápida de servidores (Aba 2)
+-- Varredura ultrarrápida e inteligente de servidores (Busca em massa nas páginas da API)
 task.spawn(function()
     while true do
-        task.wait(1)
+        task.wait(1.5)
         if serverHopSearching then
             local query = searchTargetBox.Text:lower()
             if query ~= "" then
@@ -404,12 +403,14 @@ task.spawn(function()
                 end
 
                 if not found then
-                    hopStatusButton.Text = "Varrendo..."
+                    hopStatusButton.Text = "Varrendo API..."
                     saveStateAndTeleport(function()
                         pcall(function()
                             local cursor = ""
                             local targetServerId = nil
-                            for i = 1, 3 do
+                            
+                            -- Varre rapidamente até 5 páginas de servidores de uma vez (cerca de 500 servidores)
+                            for i = 1, 5 do
                                 local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
                                 if cursor ~= "" then url = url .. "&cursor=" .. cursor end
                                 
@@ -439,6 +440,7 @@ task.spawn(function()
                             if targetServerId then
                                 TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServerId, LocalPlayer)
                             else
+                                -- Se não achou listado nas páginas, pula direto para um servidor aleatório com vagas para tentar a sorte
                                 local req = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
                                 local data = HttpService:JSONDecode(req)
                                 if data and data.data then
@@ -455,7 +457,7 @@ task.spawn(function()
                             end
                         end)
                     end)
-                    task.wait(4)
+                    task.wait(6)
                 end
             end
         end
@@ -493,7 +495,6 @@ task.spawn(function()
             local validPlayers = {}
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
-                    table.init(validPlayers, p.Character) -- safety mapping below
                     table.insert(validPlayers, p.Character)
                 end
             end
