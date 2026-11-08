@@ -1,10 +1,11 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin Fixo + Botão Único de Retorno de Teleporte
+    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin/Auto-Load + Server Hop por Nome
 --]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -14,10 +15,19 @@ local todosActive = false
 local antiFlingActive = false
 local invisibleActive = false
 local throwPartsActive = false
+local serverHopSearching = false
 
 local preTeleportPos = nil -- Armazena a posição antes de ser teleportado pelo jogo
 
+local scriptUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source"
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
+
+-- Auto-executável / Re-injetar após teleporte ou rejoin
+if queueteleport then
+    pcall(function()
+        queueteleport('loadstring(game:HttpGet("' .. scriptUrl .. '"))()')
+    end)
+end
 
 if PlayerGui:FindFirstChild("MassFlingUI") then
     PlayerGui.MassFlingUI:Destroy()
@@ -29,7 +39,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 320)
+mainFrame.Size = UDim2.new(0, 180, 0, 355)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -102,16 +112,27 @@ targetBox.Position = UDim2.new(0, 10, 0, 165)
 targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
-targetBox.PlaceholderText = "Digite parte do nome..."
+targetBox.PlaceholderText = "Nome p/ achar em servs..."
 targetBox.Text = ""
 targetBox.TextSize = 12
 targetBox.Font = Enum.Font.SourceSans
 targetBox.Parent = mainFrame
 Instance.new("UICorner", targetBox).CornerRadius = UDim.new(0, 6)
 
+local hopStatusButton = Instance.new("TextButton")
+hopStatusButton.Size = UDim2.new(0, 160, 0, 26)
+hopStatusButton.Position = UDim2.new(0, 10, 0, 196)
+hopStatusButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+hopStatusButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+hopStatusButton.TextSize = 11
+hopStatusButton.Font = Enum.Font.SourceSansBold
+hopStatusButton.Text = "Procurar em Servidores: OFF"
+hopStatusButton.Parent = mainFrame
+Instance.new("UICorner", hopStatusButton).CornerRadius = UDim.new(0, 6)
+
 local throwPartsButton = Instance.new("TextButton")
 throwPartsButton.Size = UDim2.new(0, 160, 0, 26)
-throwPartsButton.Position = UDim2.new(0, 10, 0, 196)
+throwPartsButton.Position = UDim2.new(0, 10, 0, 227)
 throwPartsButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 throwPartsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 throwPartsButton.TextSize = 12
@@ -120,10 +141,9 @@ throwPartsButton.Text = "Jogar Blocos: OFF"
 throwPartsButton.Parent = mainFrame
 Instance.new("UICorner", throwPartsButton).CornerRadius = UDim.new(0, 6)
 
--- Botão Único para Voltar após ser teleportado pelo jogo
 local returnButton = Instance.new("TextButton")
-returnButton.Size = UDim2.new(0, 160, 0, 32)
-returnButton.Position = UDim2.new(0, 10, 0, 227)
+returnButton.Size = UDim2.new(0, 160, 0, 28)
+returnButton.Position = UDim2.new(0, 10, 0, 258)
 returnButton.BackgroundColor3 = Color3.fromRGB(50, 150, 100)
 returnButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 returnButton.TextSize = 12
@@ -140,7 +160,7 @@ RunService.Heartbeat:Connect(function()
     if root then
         if lastPos then
             local dist = (root.Position - lastPos).Magnitude
-            if dist > 40 then -- Se o jogo puxou/teleportou o personagem
+            if dist > 40 then
                 preTeleportPos = CFrame.new(lastPos)
             end
         end
@@ -198,14 +218,15 @@ end)
 rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
-    if queueteleport then
-        pcall(function()
-            queueteleport("task.spawn(function() if not game:IsLoaded() then game.Loaded:Wait() end TeleportService:TeleportToPlaceInstance(" .. game.PlaceId .. ", '" .. game.JobId .. "', game:GetService('Players').LocalPlayer) end)")
-        end)
-    end
     pcall(function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end)
+end)
+
+hopStatusButton.MouseButton1Click:Connect(function()
+    serverHopSearching = not serverHopSearching
+    hopStatusButton.Text = serverHopSearching and "Procurar em Servidores: ON" or "Procurar em Servidores: OFF"
+    hopStatusButton.BackgroundColor3 = serverHopSearching and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(80, 80, 80)
 end)
 
 local function getTargetPlayer()
@@ -228,6 +249,49 @@ local function isValidTarget(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     return targetRoot and humanoid and humanoid.Health > 0
 end
+
+-- Sistema de Server Hop automático para achar o jogador digitado
+task.spawn(function()
+    while true do
+        task.wait(5)
+        if serverHopSearching and not todosActive then
+            local query = targetBox.Text:lower()
+            if query ~= "" then
+                local found = false
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer then
+                        local pName, pDisp = player.Name:lower(), player.DisplayName:lower()
+                        if pName:find(query) or pDisp:find(query) then
+                            found = true
+                            break
+                        end
+                    end
+                end
+
+                -- Se não encontrou o jogador neste servidor, vai para outro servidor
+                if not found then
+                    hopStatusButton.Text = "Trocando de Servidor..."
+                    pcall(function()
+                        local servers = {}
+                        local req = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+                        local data = HttpService:JSONDecode(req)
+                        if data and data.data then
+                            for _, s in ipairs(data.data) do
+                                if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                                    table.insert(servers, s.id)
+                                end
+                            end
+                        end
+                        if #servers > 0 then
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+                        end
+                    end)
+                    task.wait(10)
+                end
+            end
+        end
+    end
+end)
 
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
