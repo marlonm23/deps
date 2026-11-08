@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Balloon/Ragdoll Preciso
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Balloon por Aviso de Admin
 --]]
 
 local Players = game:GetService("Players")
@@ -209,40 +209,28 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- DETECTOR PRECISO DE BALLOON / COMANDO DE ADMIN REAL
+-- DETECTOR DE AVISO DE ADMIN NA TELA (Procura por caixas de texto com o comando "balloon")
 task.spawn(function()
     while true do
-        task.wait(0.4)
+        task.wait(0.2)
         local char = LocalPlayer.Character
         if char then
-            local isBalloonActive = false
+            local adminNotifiedBalloon = false
 
-            -- 1. Procura especificamente se anexou um objeto de Balão/Ragdoll real no seu personagem
-            for _, obj in ipairs(char:GetChildren()) do
-                local name = obj.Name:lower()
-                -- Verifica se é um acessório de balão ou peça com propriedade específica de ragdoll de admin
-                if name == "balloon" or name == "ragdollpart" or (obj:IsA("BasePart") and name:find("balloon")) then
-                    isBalloonActive = true
-                    break
-                end
-            end
-
-            -- 2. Procura na PlayerGui por caixas de texto com o comando explícito de balão aplicado em você
-            if not isBalloonActive then
-                for _, gui in ipairs(PlayerGui:GetDescendants()) do
-                    if gui:IsA("TextLabel") and gui.Visible then
-                        local text = gui.Text:lower()
-                        -- Só dispara se o texto contiver exatamente o comando de balão do admin
-                        if text:find(":balloon") or text:find("ballooning") or text:find("ragdoll player") then
-                            isBalloonActive = true
-                            break
-                        end
+            -- Varre todas as UIs da tela (PlayerGui) procurando por avisos de comando de admin
+            for _, gui in ipairs(PlayerGui:GetDescendants()) do
+                if (gui:IsA("TextLabel") or gui:IsA("TextBox")) and gui.Visible then
+                    local text = gui.Text:lower()
+                    -- Se a telinha/aviso na tela contiver o comando de balão, dispara
+                    if text:find("balloon") or text:find(":balloon") then
+                        adminNotifiedBalloon = true
+                        break
                     end
                 end
             end
 
-            -- Se detectou o balão/comando real, destrói as juntas para resetar na hora
-            if isBalloonActive then
+            -- Se o aviso do admin apareceu na tela, reseta na hora para anular o bug
+            if adminNotifiedBalloon then
                 pcall(function()
                     char:BreakJoints()
                 end)
