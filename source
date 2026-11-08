@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Tracker Direto por UserId + Auto-Reset Efeito Verde
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos CSV via GitHub URL + Filtro + Localizar
 --]]
 
 local Players = game:GetService("Players")
@@ -16,8 +16,7 @@ local savedConfig = _G.MassFlingConfig or {
     antiFlingActive = false,
     invisibleActive = false,
     throwPartsActive = false,
-    targetText = "",
-    searchUserIdText = ""
+    targetText = ""
 }
 
 local flingActive = savedConfig.flingActive
@@ -28,12 +27,13 @@ local throwPartsActive = savedConfig.throwPartsActive
 
 local preTeleportPos = nil
 local scriptUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source"
+local csvUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/id"
+
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
 local function saveStateAndTeleport(teleportFunction)
     if queueteleport then
         local targetVal = targetBox and targetBox.Text or savedConfig.targetText
-        local searchVal = searchUserIdBox and searchUserIdBox.Text or savedConfig.searchUserIdText
         
         local codeToQueue = string.format([[
             _G.MassFlingConfig = {
@@ -42,14 +42,12 @@ local function saveStateAndTeleport(teleportFunction)
                 antiFlingActive = %s,
                 invisibleActive = %s,
                 throwPartsActive = %s,
-                targetText = %q,
-                searchUserIdText = %q
+                targetText = %q
             }
             loadstring(game:HttpGet(%q))()
         ]], 
         tostring(flingActive), tostring(todosActive), tostring(antiFlingActive), 
-        tostring(invisibleActive), tostring(throwPartsActive), targetVal, 
-        searchVal, scriptUrl)
+        tostring(invisibleActive), tostring(throwPartsActive), targetVal, scriptUrl)
 
         pcall(function()
             queueteleport(codeToQueue)
@@ -67,9 +65,9 @@ screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
--- Interface Principal
+-- Janela Principal
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 210, 0, 360)
+mainFrame.Size = UDim2.new(0, 230, 0, 380)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
 mainFrame.BorderSizePixel = 0
@@ -100,7 +98,7 @@ titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.Text = "⚡ Hub Principal"
+titleLabel.Text = "⚡ Hub Inimigos & Tracker"
 titleLabel.Parent = topBar
 
 -- Sistema de Abas
@@ -130,7 +128,7 @@ tab2Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
 tab2Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
 tab2Btn.TextSize = 11
 tab2Btn.Font = Enum.Font.SourceSansBold
-tab2Btn.Text = "Tracker (UserId)"
+tab2Btn.Text = "Inimigos CSV"
 tab2Btn.Parent = tabContainer
 Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 6)
 
@@ -211,49 +209,216 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- ELEMENTOS ABA 2 (Tracker via UserId)
-local searchDesc = Instance.new("TextLabel")
-searchDesc.Size = UDim2.new(1, 0, 0, 35)
-searchDesc.Position = UDim2.new(0, 0, 0, 5)
-searchDesc.BackgroundTransparency = 1
-searchDesc.TextColor3 = Color3.fromRGB(180, 180, 190)
-searchDesc.TextSize = 11
-searchDesc.Font = Enum.Font.SourceSans
-searchDesc.TextWrapped = true
-searchDesc.Text = "Digite o UserId numérico do jogador para entrar no servidor dele:"
-searchDesc.Parent = tab2Content
+-- ELEMENTOS ABA 2 (Inimigos CSV com Filtro e Botões de Localizar)
+local filterBox = Instance.new("TextBox")
+filterBox.Size = UDim2.new(1, 0, 0, 28)
+filterBox.Position = UDim2.new(0, 0, 0, 0)
+filterBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+filterBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+filterBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
+filterBox.PlaceholderText = "🔍 Filtrar inimigo por nome..."
+filterBox.Text = ""
+filterBox.TextSize = 11
+filterBox.Font = Enum.Font.SourceSans
+filterBox.Parent = tab2Content
+Instance.new("UICorner", filterBox).CornerRadius = UDim.new(0, 6)
 
-local searchUserIdBox = Instance.new("TextBox")
-searchUserIdBox.Size = UDim2.new(1, 0, 0, 32)
-searchUserIdBox.Position = UDim2.new(0, 0, 0, 45)
-searchUserIdBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
-searchUserIdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-searchUserIdBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
-searchUserIdBox.PlaceholderText = "Ex: 12345678"
-searchUserIdBox.Text = savedConfig.searchUserIdText or ""
-searchUserIdBox.TextSize = 12
-searchUserIdBox.Font = Enum.Font.SourceSans
-searchUserIdBox.Parent = tab2Content
-Instance.new("UICorner", searchUserIdBox).CornerRadius = UDim.new(0, 6)
+local enemiesScroll = Instance.new("ScrollingFrame")
+enemiesScroll.Size = UDim2.new(1, 0, 1, -35)
+enemiesScroll.Position = UDim2.new(0, 0, 0, 35)
+enemiesScroll.BackgroundTransparency = 1
+enemiesScroll.BorderSizePixel = 0
+enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+enemiesScroll.ScrollBarThickness = 3
+enemiesScroll.Parent = tab2Content
 
-searchUserIdBox:GetPropertyChangedSignal("Text"):Connect(function()
-    savedConfig.searchUserIdText = searchUserIdBox.Text
+local uiList = Instance.new("UIListLayout")
+uiList.SortOrder = Enum.SortOrder.LayoutOrder
+uiList.Padding = UDim.new(0, 4)
+uiList.Parent = enemiesScroll
+
+local statusCsvLabel = Instance.new("TextLabel")
+statusCsvLabel.Size = UDim2.new(1, 0, 0, 25)
+statusCsvLabel.BackgroundTransparency = 1
+statusCsvLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+statusCsvLabel.TextSize = 11
+statusCsvLabel.Font = Enum.Font.SourceSansBold
+statusCsvLabel.Text = "Baixando lista do GitHub..."
+statusCsvLabel.Parent = enemiesScroll
+
+-- Função para localizar um UserId via API com antitrava
+local function trackAndTeleport(userId, btnLabel)
+    btnLabel.Text = "Buscando..."
+    task.spawn(function()
+        local inCurrentServer = Players:GetPlayerByUserId(userId)
+        if inCurrentServer then
+            btnLabel.Text = "Já está aqui!"
+            task.wait(1.5)
+            btnLabel.Text = "Localizar"
+            return
+        end
+
+        local reqFunc = (syn and syn.request) or (http and http.request) or request or http_request
+        if not reqFunc then
+            btnLabel.Text = "Sem suporte HTTP"
+            return
+        end
+
+        local responseData = nil
+        local reqThread = task.spawn(function()
+            pcall(function()
+                local body = HttpService:JSONEncode({ userIds = { userId } })
+                local res = reqFunc({
+                    Url = "https://presence.roproxy.com/v1/presence/users",
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = body
+                })
+                if res and res.Body then
+                    responseData = HttpService:JSONDecode(res.Body)
+                end
+            end)
+        end)
+
+        local start = tick()
+        while not responseData and (tick() - start < 2.5) do
+            task.wait(0.1)
+        end
+
+        if responseData and responseData.userPresences and responseData.userPresences[1] then
+            local presence = responseData.userPresences[1]
+            if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
+                btnLabel.Text = "Entrando..."
+                saveStateAndTeleport(function()
+                    TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
+                end)
+            else
+                btnLabel.Text = "Offline/Fechado"
+                task.wait(2)
+                btnLabel.Text = "Localizar"
+            end
+        else
+            btnLabel.Text = "Erro API"
+            task.wait(2)
+            btnLabel.Text = "Localizar"
+        end
+    end)
+end
+
+-- Carrega e processa o arquivo CSV direto do GitHub
+local enemiesList = {}
+
+local function loadEnemiesCSV()
+    for _, child in ipairs(enemiesScroll:GetChildren()) do
+        if child:IsA("Frame") or child == statusCsvLabel then
+            child:Destroy()
+        end
+    end
+    enemiesList = {}
+
+    local success, csvData = pcall(function()
+        return game:HttpGet(csvUrl)
+    end)
+
+    if not success or not csvData then
+        statusCsvLabel.Text = "Erro ao baixar o link do GitHub!"
+        statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+        enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
+        return
+    end
+
+    statusCsvLabel:Destroy()
+
+    -- Formato esperado por linha: nome;id;
+    for line in csvData:gmatch("[^\r\n]+") do
+        local name, idStr = line:match("^(.-);(.-);$")
+        if not name or not idStr then
+            name, idStr = line:match("^(.-);(.*)$") -- caso venha sem o último ponto e vírgula
+        end
+        
+        if name and idStr then
+            name = name:gsub("^%s+", ""):gsub("%s+$", "")
+            local userId = tonumber(idStr:gsub("%s+", ""))
+            if userId then
+                table.insert(enemiesList, { name = name, id = userId })
+            end
+        end
+    end
+
+    if #enemiesList == 0 then
+        local emptyLbl = Instance.new("TextLabel")
+        emptyLbl.Size = UDim2.new(1, 0, 0, 30)
+        emptyLbl.BackgroundTransparency = 1
+        emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
+        emptyLbl.TextSize = 11
+        emptyLbl.Font = Enum.Font.SourceSans
+        emptyLbl.Text = "CSV vazio ou fora do formato (nome;id;)!"
+        emptyLbl.Parent = enemiesScroll
+        return
+    end
+
+    -- Cria os elementos visuais de cada inimigo na lista
+    for _, enemy in ipairs(enemiesList) do
+        local row = Instance.new("Frame")
+        row.Name = enemy.name
+        row.Size = UDim2.new(1, 0, 0, 26)
+        row.BackgroundTransparency = 1
+        row.Parent = enemiesScroll
+
+        local nameLbl = Instance.new("TextLabel")
+        nameLbl.Size = UDim2.new(0.6, 0, 1, 0)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.TextColor3 = Color3.fromRGB(230, 230, 240)
+        nameLbl.TextSize = 11
+        nameLbl.Font = Enum.Font.SourceSansBold
+        nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        nameLbl.Text = " " .. enemy.name
+        nameLbl.Parent = row
+
+        local locBtn = Instance.new("TextButton")
+        locBtn.Size = UDim2.new(0.4, 0, 1, 0)
+        locBtn.Position = UDim2.new(0.6, 0, 0, 0)
+        locBtn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+        locBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        locBtn.TextSize = 11
+        locBtn.Font = Enum.Font.SourceSansBold
+        locBtn.Text = "Localizar"
+        locBtn.Parent = row
+        Instance.new("UICorner", locBtn).CornerRadius = UDim.new(0, 5)
+
+        locBtn.MouseButton1Click:Connect(function()
+            trackAndTeleport(enemy.id, locBtn)
+        end)
+
+        row.Parent = enemiesScroll
+    end
+
+    enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, #enemiesList * 30)
+end
+
+-- Filtro dinâmico por nome ao digitar
+filterBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = filterBox.Text:lower()
+    local visibleCount = 0
+
+    for _, child in ipairs(enemiesScroll:GetChildren()) do
+        if child:IsA("Frame") then
+            local enemyName = child.Name:lower()
+            if query == "" or enemyName:find(query) then
+                child.Visible = true
+                visibleCount = visibleCount + 1
+            else
+                child.Visible = false
+            end
+        end
+    end
+    enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, visibleCount * 30)
 end)
 
-local searchStatusLabel = Instance.new("TextLabel")
-searchStatusLabel.Size = UDim2.new(1, 0, 0, 35)
-searchStatusLabel.Position = UDim2.new(0, 0, 0, 82)
-searchStatusLabel.BackgroundTransparency = 1
-searchStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
-searchStatusLabel.TextSize = 11
-searchStatusLabel.Font = Enum.Font.SourceSansBold
-searchStatusLabel.TextWrapped = true
-searchStatusLabel.Text = "Status: Aguardando UserId..."
-searchStatusLabel.Parent = tab2Content
+-- Carrega os inimigos ao iniciar
+task.spawn(loadEnemiesCSV)
 
-local trackButton = createButton(tab2Content, "Rastrear e Entrar", 125, Color3.fromRGB(45, 120, 220))
-
--- Eventos
+-- Eventos de controles padrões
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -307,72 +472,6 @@ returnButton.MouseButton1Click:Connect(function()
     if root and preTeleportPos then
         root.CFrame = preTeleportPos
     end
-end)
-
--- RASTREADOR DIRETO VIA USERID
-trackButton.MouseButton1Click:Connect(function()
-    local inputId = searchUserIdBox.Text:gsub("%s+", "")
-    local userId = tonumber(inputId)
-    
-    if not userId then
-        searchStatusLabel.Text = "Status: Digite um UserId numérico válido!"
-        searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
-        return
-    end
-
-    searchStatusLabel.Text = "Status: Verificando jogador no servidor atual..."
-    searchStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
-
-    task.spawn(function()
-        local inCurrentServer = Players:GetPlayerByUserId(userId)
-        if inCurrentServer then
-            searchStatusLabel.Text = "Status: O jogador já está neste servidor!"
-            searchStatusLabel.TextColor3 = Color3.fromRGB(50, 220, 50)
-            return
-        end
-
-        searchStatusLabel.Text = "Status: Consultando Presença via API..."
-        
-        local reqFunc = (syn and syn.request) or (http and http.request) or request or http_request
-        if not reqFunc then
-            searchStatusLabel.Text = "Status: Executor sem suporte a http request!"
-            searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
-            return
-        end
-
-        local success, response = pcall(function()
-            local body = HttpService:JSONEncode({ userIds = { userId } })
-            local res = reqFunc({
-                Url = "https://presence.roproxy.com/v1/presence/users",
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = body
-            })
-            return HttpService:JSONDecode(res.Body)
-        end)
-
-        if success and response and response.userPresences and response.userPresences[1] then
-            local presence = response.userPresences[1]
-            local userState = presence.userPresenceType
-            local targetJobId = presence.gameId
-            local targetPlaceId = presence.placeId
-
-            if userState == 2 and targetJobId and targetJobId ~= "" then
-                searchStatusLabel.Text = "Status: Servidor achado! Teleportando..."
-                searchStatusLabel.TextColor3 = Color3.fromRGB(50, 220, 50)
-                
-                saveStateAndTeleport(function()
-                    TeleportService:TeleportToPlaceInstance(targetPlaceId or game.PlaceId, targetJobId, LocalPlayer)
-                end)
-            else
-                searchStatusLabel.Text = "Status: Offline, em outro jogo ou privacidade fechada!"
-                searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
-            end
-        else
-            searchStatusLabel.Text = "Status: Falha na requisição da API."
-            searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
-        end
-    end)
 end)
 
 -- Monitoramento de posição para o botão Voltar
