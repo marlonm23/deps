@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos CSV via GitHub URL + Filtro + Localizar
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos CSV Ajustado + Filtro + Localizar
 --]]
 
 local Players = game:GetService("Players")
@@ -305,7 +305,7 @@ local function trackAndTeleport(userId, btnLabel)
     end)
 end
 
--- Carrega e processa o arquivo CSV direto do GitHub
+-- Carrega e processa o arquivo CSV direto do GitHub de forma flexível
 local enemiesList = {}
 
 local function loadEnemiesCSV()
@@ -329,18 +329,20 @@ local function loadEnemiesCSV()
 
     statusCsvLabel:Destroy()
 
-    -- Formato esperado por linha: nome;id;
+    -- Lê linha por linha aceitando qualquer separador por ponto e vírgula ou espaço
     for line in csvData:gmatch("[^\r\n]+") do
-        local name, idStr = line:match("^(.-);(.-);$")
-        if not name or not idStr then
-            name, idStr = line:match("^(.-);(.*)$") -- caso venha sem o último ponto e vírgula
-        end
-        
-        if name and idStr then
-            name = name:gsub("^%s+", ""):gsub("%s+$", "")
-            local userId = tonumber(idStr:gsub("%s+", ""))
-            if userId then
-                table.insert(enemiesList, { name = name, id = userId })
+        if not line:match("^%s*#") then -- Ignora comentários caso haja
+            local name, idStr = line:match("([^;]+);([^;]+)")
+            if not name then
+                name, idStr = line:match("(%S+)%s+(%d+)")
+            end
+            
+            if name and idStr then
+                name = name:gsub("^%s+", ""):gsub("%s+$", "")
+                local userId = tonumber(idStr:gsub("%D+", ""))
+                if userId then
+                    table.insert(enemiesList, { name = name, id = userId })
+                end
             end
         end
     end
@@ -352,7 +354,7 @@ local function loadEnemiesCSV()
         emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
         emptyLbl.TextSize = 11
         emptyLbl.Font = Enum.Font.SourceSans
-        emptyLbl.Text = "CSV vazio ou fora do formato (nome;id;)!"
+        emptyLbl.Text = "Nenhum nome lido! Verifique o formato no GitHub."
         emptyLbl.Parent = enemiesScroll
         return
     end
@@ -389,8 +391,6 @@ local function loadEnemiesCSV()
         locBtn.MouseButton1Click:Connect(function()
             trackAndTeleport(enemy.id, locBtn)
         end)
-
-        row.Parent = enemiesScroll
     end
 
     enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, #enemiesList * 30)
