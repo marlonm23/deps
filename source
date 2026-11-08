@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Artilharia Pesada + Inimigos JSON + Anti-Fling + Anti-Freeze (Quebra de Ancoragem)
+    Script: Mass Walkfling + Artilharia em Área (AoE Blast) + Inimigos JSON + Anti-Fling + Anti-Desync
 --]]
 
 local Players = game:GetService("Players")
@@ -246,7 +246,7 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para forçar a quebra de ancoragem (Anti-Freeze)
+-- Função para quebrar congelamentos estáticos
 local function breakEnemyFreeze(targetChar)
     if not targetChar then return end
     pcall(function()
@@ -254,7 +254,7 @@ local function breakEnemyFreeze(targetChar)
             if part:IsA("BasePart") then
                 part.Anchored = false
                 part.CanCollide = true
-                part.CustomPhysicalProperties = PhysicalProperties.new(10000, 0, 1, 0, 1)
+                part.CustomPhysicalProperties = PhysicalProperties.new(50000, 0, 1, 0, 1)
             end
         end
         local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
@@ -263,27 +263,6 @@ local function breakEnemyFreeze(targetChar)
             humanoid.Sit = false
         end
     end)
-end
-
-local function getTargetHitParts(character)
-    local parts = {}
-    if not character then return parts end
-
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if root then table.insert(parts, root) end
-
-    for _, obj in ipairs(character:GetChildren()) do
-        if obj:IsA("Accessory") or obj:IsA("Tool") then
-            local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildOfClass("BasePart")
-            if handle and handle:IsA("BasePart") then
-                table.insert(parts, handle)
-            end
-        elseif obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" then
-            table.insert(parts, obj)
-        end
-    end
-
-    return parts
 end
 
 -- Rastreio Avatar Matcher
@@ -584,9 +563,8 @@ end
 
 local function isValidTarget(targetChar)
     if not targetChar then return false end
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-    return targetRoot and humanoid and humanoid.Health > 0
+    return humanoid and humanoid.Health > 0
 end
 
 -- ANTI-FLING
@@ -621,7 +599,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Artilharia Pesada com Quebra de Ancoragem (Anti-Freeze)
+-- Loop de Artilharia em Área (AoE Blast & Convergence)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -649,17 +627,19 @@ task.spawn(function()
 
         if targetChar then
             breakEnemyFreeze(targetChar)
-            local hitParts = getTargetHitParts(targetChar)
             
-            if #hitParts > 0 then
+            -- Pega qualquer peça de referência (Root, Torso ou Head) para contornar desincronizações
+            local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("Head")
+            
+            if targetPart then
+                local centerPos = targetPart.Position
+                
                 for _, part in ipairs(Workspace:GetDescendants()) do
                     if not throwPartsActive then break end
                     
                     if part:IsA("BasePart") and not part.Anchored then
-                        local color = part.Color
-                        local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
-                        
-                        if isBlack then
+                        local dist = (part.Position - centerPos).Magnitude
+                        if dist < 150 then
                             local isCharacterPart = false
                             for _, p in ipairs(Players:GetPlayers()) do
                                 if p.Character and part:IsDescendantOf(p.Character) then
@@ -669,14 +649,13 @@ task.spawn(function()
                             end
 
                             if not isCharacterPart then
-                                local selectedHitPart = hitParts[math.random(1, #hitParts)]
                                 pcall(function()
                                     part.CanCollide = true
-                                    part.CustomPhysicalProperties = PhysicalProperties.new(10000, 0, 1, 0, 1)
+                                    part.CustomPhysicalProperties = PhysicalProperties.new(50000, 0, 1, 0, 1)
                                     
-                                    local direction = (selectedHitPart.Position - part.Position).Unit
-                                    part.AssemblyLinearVelocity = direction * 1000 + Vector3.new(0, 200, 0)
-                                    part.AssemblyAngularVelocity = Vector3.new(10000, 10000, 10000)
+                                    local pullDirection = (centerPos - part.Position).Unit
+                                    part.AssemblyLinearVelocity = pullDirection * 1500 + Vector3.new(0, 300, 0)
+                                    part.AssemblyAngularVelocity = Vector3.new(25000, 25000, 25000)
                                 end)
                             end
                         end
@@ -688,7 +667,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Padrão de Alta Massa com Quebra de Ancoragem
+-- Loop Fling de Alta Massa com Interseção
 task.spawn(function()
     while true do
         if not flingActive then
@@ -707,7 +686,7 @@ task.spawn(function()
 
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = PhysicalProperties.new(10000, 0, 1, 0, 1)
+                part.CustomPhysicalProperties = PhysicalProperties.new(50000, 0, 1, 0, 1)
             end
         end
 
@@ -723,8 +702,8 @@ task.spawn(function()
                 for _, targetChar in ipairs(targets) do
                     if not flingActive or not todosActive then break end
                     breakEnemyFreeze(targetChar)
-                    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-                    if targetRoot and isValidTarget(targetChar) then
+                    local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+                    if targetPart and isValidTarget(targetChar) then
                         local startTick = tick()
                         while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.15) do
                             character = LocalPlayer.Character
@@ -732,15 +711,12 @@ task.spawn(function()
                             if not character or not rootPart then break end
 
                             pcall(function()
-                                targetRoot.CanCollide = true
-                                for _, part in ipairs(targetChar:GetChildren()) do
-                                    if part:IsA("BasePart") then part.CanCollide = true end
-                                end
+                                targetPart.CanCollide = true
                             end)
 
-                            rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.5, 0))
-                            rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetRoot.CFrame.LookVector * 20000)
-                            rootPart.AssemblyAngularVelocity = Vector3.new(20000, 20000, 20000)
+                            rootPart.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, -2.5, 0))
+                            rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetPart.CFrame.LookVector * 20000)
+                            rootPart.AssemblyAngularVelocity = Vector3.new(25000, 25000, 25000)
 
                             RunService.Heartbeat:Wait()
                         end
@@ -754,24 +730,21 @@ task.spawn(function()
             if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
                 local targetChar = targetPlayer.Character
                 breakEnemyFreeze(targetChar)
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
                 
-                if targetRoot then
+                if targetPart then
                     while flingActive and not todosActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
                         character = LocalPlayer.Character
                         rootPart = character and character:FindFirstChild("HumanoidRootPart")
                         if not character or not rootPart then break end
                         
                         pcall(function()
-                            targetRoot.CanCollide = true
-                            for _, part in ipairs(targetChar:GetChildren()) do
-                                if part:IsA("BasePart") then part.CanCollide = true end
-                            end
+                            targetPart.CanCollide = true
                         end)
                         
-                        rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.5, 0))
-                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetRoot.CFrame.LookVector * 20000)
-                        rootPart.AssemblyAngularVelocity = Vector3.new(20000, 20000, 20000)
+                        rootPart.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, -2.5, 0))
+                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetPart.CFrame.LookVector * 20000)
+                        rootPart.AssemblyAngularVelocity = Vector3.new(25000, 25000, 25000)
                         
                         RunService.Heartbeat:Wait()
                     end
