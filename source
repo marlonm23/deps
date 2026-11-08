@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar Fluido (Sem Travar)
 --]]
 
 local Players = game:GetService("Players")
@@ -243,29 +243,39 @@ statusCsvLabel.BackgroundTransparency = 1
 statusCsvLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
 statusCsvLabel.TextSize = 11
 statusCsvLabel.Font = Enum.Font.SourceSansBold
-statusCsvLabel.Text = "Baixando JSON do GitHub..."
+statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para localizar um UserId via API com antitrava
+-- Função para localizar um UserId via API com indicador visual de carregamento
 local function trackAndTeleport(userId, btnLabel)
-    btnLabel.Text = "Buscando..."
+    if btnLabel.Text:find("Buscando") then return end
+    
+    local originalText = btnLabel.Text
+    btnLabel.Text = "🔄 Buscando..."
+    btnLabel.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
+
     task.spawn(function()
         local inCurrentServer = Players:GetPlayerByUserId(userId)
         if inCurrentServer then
-            btnLabel.Text = "Já está aqui!"
+            btnLabel.Text = "✨ Já está aqui!"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
             task.wait(1.5)
-            btnLabel.Text = "Localizar"
+            btnLabel.Text = originalText
+            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
             return
         end
 
         local reqFunc = (syn and syn.request) or (http and http.request) or request or http_request
         if not reqFunc then
-            btnLabel.Text = "Sem suporte HTTP"
+            btnLabel.Text = "❌ Sem HTTP"
+            task.wait(2)
+            btnLabel.Text = originalText
+            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
             return
         end
 
         local responseData = nil
-        local reqThread = task.spawn(function()
+        task.spawn(function()
             pcall(function()
                 local body = HttpService:JSONEncode({ userIds = { userId } })
                 local res = reqFunc({
@@ -280,6 +290,7 @@ local function trackAndTeleport(userId, btnLabel)
             end)
         end)
 
+        -- Timeout dinâmico sem travar o thread principal
         local start = tick()
         while not responseData and (tick() - start < 2.5) do
             task.wait(0.1)
@@ -288,111 +299,111 @@ local function trackAndTeleport(userId, btnLabel)
         if responseData and responseData.userPresences and responseData.userPresences[1] then
             local presence = responseData.userPresences[1]
             if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
-                btnLabel.Text = "Entrando..."
+                btnLabel.Text = "🚀 Entrando..."
+                btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
                 saveStateAndTeleport(function()
                     TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
                 end)
             else
-                btnLabel.Text = "Offline/Fechado"
+                btnLabel.Text = "⚠️ Offline/Fechado"
+                btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
                 task.wait(2)
-                btnLabel.Text = "Localizar"
+                btnLabel.Text = originalText
+                btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
             end
         else
-            btnLabel.Text = "Erro API"
+            btnLabel.Text = "❌ Erro API"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
             task.wait(2)
-            btnLabel.Text = "Localizar"
+            btnLabel.Text = originalText
+            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
         end
     end)
 end
 
--- Carrega e decodifica o JSON direto do GitHub
+-- Carrega e decodifica o JSON de forma 100% assíncrona
 local enemiesList = {}
 
 local function loadEnemiesJSON()
-    for _, child in ipairs(enemiesScroll:GetChildren()) do
-        if child:IsA("Frame") or child == statusCsvLabel then
-            child:Destroy()
-        end
-    end
-    enemiesList = {}
-
-    local success, rawData = pcall(function()
-        return game:HttpGet(jsonUrl)
-    end)
-
-    if not success or not rawData then
-        statusCsvLabel.Text = "Erro ao baixar o JSON do GitHub!"
-        statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
-        enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
-        return
-    end
-
-    local decodeSuccess, decodedData = pcall(function()
-        return HttpService:JSONDecode(rawData)
-    end)
-
-    if not decodeSuccess or not decodedData then
-        statusCsvLabel.Text = "Erro ao decodificar o JSON!"
-        statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
-        enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
-        return
-    end
-
-    statusCsvLabel:Destroy()
-
-    for _, entry in ipairs(decodedData) do
-        if entry.name and entry.id then
-            table.insert(enemiesList, { name = tostring(entry.name), id = tonumber(entry.id) })
-        end
-    end
-
-    if #enemiesList == 0 then
-        local emptyLbl = Instance.new("TextLabel")
-        emptyLbl.Size = UDim2.new(1, 0, 0, 30)
-        emptyLbl.BackgroundTransparency = 1
-        emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
-        emptyLbl.TextSize = 11
-        emptyLbl.Font = Enum.Font.SourceSans
-        emptyLbl.Text = "Nenhum inimigo encontrado no JSON!"
-        emptyLbl.Parent = enemiesScroll
-        return
-    end
-
-    -- Cria os elementos visuais de cada inimigo na lista
-    for _, enemy in ipairs(enemiesList) do
-        local row = Instance.new("Frame")
-        row.Name = enemy.name
-        row.Size = UDim2.new(1, 0, 0, 26)
-        row.BackgroundTransparency = 1
-        row.Parent = enemiesScroll
-
-        local nameLbl = Instance.new("TextLabel")
-        nameLbl.Size = UDim2.new(0.6, 0, 1, 0)
-        nameLbl.BackgroundTransparency = 1
-        nameLbl.TextColor3 = Color3.fromRGB(230, 230, 240)
-        nameLbl.TextSize = 11
-        nameLbl.Font = Enum.Font.SourceSansBold
-        nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-        nameLbl.Text = " " .. enemy.name
-        nameLbl.Parent = row
-
-        local locBtn = Instance.new("TextButton")
-        locBtn.Size = UDim2.new(0.4, 0, 1, 0)
-        locBtn.Position = UDim2.new(0.6, 0, 0, 0)
-        locBtn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
-        locBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        locBtn.TextSize = 11
-        locBtn.Font = Enum.Font.SourceSansBold
-        locBtn.Text = "Localizar"
-        locBtn.Parent = row
-        Instance.new("UICorner", locBtn).CornerRadius = UDim.new(0, 5)
-
-        locBtn.MouseButton1Click:Connect(function()
-            trackAndTeleport(enemy.id, locBtn)
+    task.spawn(function()
+        local success, rawData = pcall(function()
+            return game:HttpGet(jsonUrl)
         end)
-    end
 
-    enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, #enemiesList * 30)
+        if not success or not rawData then
+            statusCsvLabel.Text = "❌ Erro ao baixar JSON!"
+            statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+            enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
+            return
+        end
+
+        local decodeSuccess, decodedData = pcall(function()
+            return HttpService:JSONDecode(rawData)
+        end)
+
+        if not decodeSuccess or not decodedData then
+            statusCsvLabel.Text = "❌ Erro ao decodificar JSON!"
+            statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+            enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
+            return
+        end
+
+        statusCsvLabel:Destroy()
+
+        for _, entry in ipairs(decodedData) do
+            if entry.name and entry.id then
+                table.insert(enemiesList, { name = tostring(entry.name), id = tonumber(entry.id) })
+            end
+        end
+
+        if #enemiesList == 0 then
+            local emptyLbl = Instance.new("TextLabel")
+            emptyLbl.Size = UDim2.new(1, 0, 0, 30)
+            emptyLbl.BackgroundTransparency = 1
+            emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
+            emptyLbl.TextSize = 11
+            emptyLbl.Font = Enum.Font.SourceSans
+            emptyLbl.Text = "Nenhum inimigo encontrado!"
+            emptyLbl.Parent = enemiesScroll
+            return
+        end
+
+        -- Cria os elementos visuais de cada inimigo na lista
+        for _, enemy in ipairs(enemiesList) do
+            local row = Instance.new("Frame")
+            row.Name = enemy.name
+            row.Size = UDim2.new(1, 0, 0, 26)
+            row.BackgroundTransparency = 1
+            row.Parent = enemiesScroll
+
+            local nameLbl = Instance.new("TextLabel")
+            nameLbl.Size = UDim2.new(0.6, 0, 1, 0)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.TextColor3 = Color3.fromRGB(230, 230, 240)
+            nameLbl.TextSize = 11
+            nameLbl.Font = Enum.Font.SourceSansBold
+            nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nameLbl.Text = " " .. enemy.name
+            nameLbl.Parent = row
+
+            local locBtn = Instance.new("TextButton")
+            locBtn.Size = UDim2.new(0.4, 0, 1, 0)
+            locBtn.Position = UDim2.new(0.6, 0, 0, 0)
+            locBtn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+            locBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            locBtn.TextSize = 11
+            locBtn.Font = Enum.Font.SourceSansBold
+            locBtn.Text = "Localizar"
+            locBtn.Parent = row
+            Instance.new("UICorner", locBtn).CornerRadius = UDim.new(0, 5)
+
+            locBtn.MouseButton1Click:Connect(function()
+                trackAndTeleport(enemy.id, locBtn)
+            end)
+        end
+
+        enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, #enemiesList * 30)
+    end)
 end
 
 -- Filtro dinâmico por nome ao digitar
@@ -415,7 +426,7 @@ filterBox:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 -- Carrega os inimigos ao iniciar
-task.spawn(loadEnemiesJSON)
+loadEnemiesJSON()
 
 -- Eventos de controles padrões
 flingButton.MouseButton1Click:Connect(function()
