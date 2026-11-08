@@ -1,13 +1,13 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin Fixo + Sistema Início/Fim (Com Loop Automático Iniciar/Parar)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin Fixo + Sistema Início/Fim (Corrigido para PlayerGui)
 --]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 local TeleportService = game:GetService("TeleportService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local flingActive = false
 local todosActive = false
@@ -21,14 +21,14 @@ local loopActive = false -- Controle do loop automático (Ir e Voltar)
 
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
-if CoreGui:FindFirstChild("MassFlingUI") then
-    CoreGui.MassFlingUI:Destroy()
+if PlayerGui:FindFirstChild("MassFlingUI") then
+    PlayerGui.MassFlingUI:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = CoreGui
+screenGui.Parent = PlayerGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 200, 0, 370)
@@ -262,7 +262,7 @@ iniciarButton.MouseButton1Click:Connect(function()
     loopActive = not loopActive
     iniciarButton.Text = loopActive and "Iniciar (Ir e Voltar: ON)" or "Iniciar (Ir e Voltar: OFF)"
     iniciarButton.BackgroundColor3 = loopActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(150, 50, 200)
-    statusLabel.Text = loopActive and "Status: Loop de ir e voltar ativado!" else "Status: Loop pausado."
+    statusLabel.Text = loopActive and "Status: Loop de ir e voltar ativado!" or "Status: Loop pausado."
 end)
 
 pararButton.MouseButton1Click:Connect(function()
@@ -282,15 +282,13 @@ task.spawn(function()
         if root then
             if lastPos then
                 local dist = (root.Position - lastPos).Magnitude
-                -- Se o jogo teleportou/puxou o jogador para longe (> 45 studs)
                 if dist > 45 then
-                    endPos = CFrame.new(lastPos) -- Salva a posição antes do teleporte como 'Fim'
+                    endPos = CFrame.new(lastPos)
                     statusLabel.Text = "Status: Teleporte detectado! 'Fim' atualizado."
                 end
             end
             lastPos = root.Position
 
-            -- Executa o ciclo automático se ativado
             if loopActive and savedPos and endPos then
                 root.CFrame = endPos
                 task.wait(0.3)
@@ -343,7 +341,6 @@ throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
--- Rejoin corrigido para o MESMO servidor (JobId)
 rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
