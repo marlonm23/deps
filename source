@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Fast Server Hop (Otimizado) + Auto-Reset Cajado de Vinhas
+    Script: Mass Walkfling + Jogar Blocos Pretos + Smart Server Hop (Fica no server e só muda ao achar) + Auto-Reset Cajado de Vinhas
 --]]
 
 local Players = game:GetService("Players")
@@ -227,7 +227,7 @@ searchDesc.TextColor3 = Color3.fromRGB(180, 180, 190)
 searchDesc.TextSize = 11
 searchDesc.Font = Enum.Font.SourceSans
 searchDesc.TextWrapped = true
-searchDesc.Text = "Digite o nome do jogador para varrer múltiplos servidores rapidamente:"
+searchDesc.Text = "Busca o servidor onde o alvo está sem sair do seu servidor atual:"
 searchDesc.Parent = tab2Content
 
 local searchTargetBox = Instance.new("TextBox")
@@ -355,7 +355,7 @@ task.spawn(function()
                         end
                     end
                 end
-                if pgo then
+                if pego then
                     humanoid.Health = 0
                 end
             end
@@ -384,80 +384,78 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- Varredura ultrarrápida e inteligente de servidores (Busca em massa nas páginas da API)
+-- Varredura inteligente: Fica no server atual verificando a API em massa até achar a pessoa exata
 task.spawn(function()
     while true do
-        task.wait(1.5)
+        task.wait(2)
         if serverHopSearching then
             local query = searchTargetBox.Text:lower()
             if query ~= "" then
-                local found = false
+                -- 1. Primeiro verifica se a pessoa já está no servidor atual
+                local foundHere = false
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer then
                         local pName, pDisp = player.Name:lower(), player.DisplayName:lower()
                         if pName:find(query) or pDisp:find(query) then
-                            found = true
+                            foundHere = true
                             break
                         end
                     end
                 end
 
-                if not found then
-                    hopStatusButton.Text = "Varrendo API..."
-                    saveStateAndTeleport(function()
-                        pcall(function()
-                            local cursor = ""
-                            local targetServerId = nil
+                if foundHere then
+                    hopStatusButton.Text = "Alvo está neste servidor!"
+                    hopStatusButton.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+                    serverHopSearching = false
+                else
+                    -- 2. Se não está aqui, varre as páginas da API em segundo plano SEM SAIR DO SERVIDOR
+                    hopStatusButton.Text = "Varrendo servidores..."
+                    pcall(function()
+                        local cursor = ""
+                        local targetServerId = nil
+                        
+                        for i = 1, 8 do -- Varre até 8 páginas de servidores (cerca de 800 servidores)
+                            if not serverHopSearching then break end
+                            local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+                            if cursor ~= "" then url = url .. "&cursor=" .. cursor end
                             
-                            -- Varre rapidamente até 5 páginas de servidores de uma vez (cerca de 500 servidores)
-                            for i = 1, 5 do
-                                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-                                if cursor ~= "" then url = url .. "&cursor=" .. cursor end
-                                
-                                local req = game:HttpGet(url)
-                                local data = HttpService:JSONDecode(req)
-                                if data and data.data then
-                                    for _, s in ipairs(data.data) do
-                                        if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
-                                            if s.players then
-                                                for _, p in ipairs(s.players) do
-                                                    local n = (p.name or ""):lower()
-                                                    local d = (p.displayName or ""):lower()
-                                                    if n:find(query) or d:find(query) then
-                                                        targetServerId = s.id
-                                                        break
-                                                    end
+                            local req = game:HttpGet(url)
+                            local data = HttpService:JSONDecode(req)
+                            if data and data.data then
+                                for _, s in ipairs(data.data) do
+                                    if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                                        if s.players then
+                                            for _, p in ipairs(s.players) do
+                                                local n = (p.name or ""):lower()
+                                                local d = (p.displayName or ""):lower()
+                                                if n:find(query) or d:find(query) then
+                                                    targetServerId = s.id
+                                                    break
                                                 end
                                             end
                                         end
-                                        if targetServerId then break end
                                     end
+                                    if targetServerId then break end
                                 end
-                                if targetServerId or not data.nextPageCursor then break end
-                                cursor = data.nextPageCursor
                             end
+                            if targetServerId or not data.nextPageCursor then break end
+                            cursor = data.nextPageCursor
+                            task.wait(0.1)
+                        end
 
-                            if targetServerId then
+                        -- 3. SÓ MUDA DE SERVIDOR SE ACHAR O ALVO EXATO
+                        if targetServerId then
+                            hopStatusButton.Text = "¡Alvo encontrado! Entrando..."
+                            hopStatusButton.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+                            serverHopSearching = false
+                            saveStateAndTeleport(function()
                                 TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServerId, LocalPlayer)
-                            else
-                                -- Se não achou listado nas páginas, pula direto para um servidor aleatório com vagas para tentar a sorte
-                                local req = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
-                                local data = HttpService:JSONDecode(req)
-                                if data and data.data then
-                                    local servers = {}
-                                    for _, s in ipairs(data.data) do
-                                        if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
-                                            table.insert(servers, s.id)
-                                        end
-                                    end
-                                    if #servers > 0 then
-                                        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
-                                    end
-                                end
-                            end
-                        end)
+                            end)
+                        else
+                            hopStatusButton.Text = "Não achado, buscando de novo..."
+                            task.wait(3)
+                        end
                     end)
-                    task.wait(6)
                 end
             end
         end
