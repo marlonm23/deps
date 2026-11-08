@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar Ultra Otimizado (Zero Trava)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Trava de Reset Automático
 --]]
 
 local Players = game:GetService("Players")
@@ -209,6 +209,41 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
+-- DETECTOR AUTOMÁTICO DE PERSONAGEM TRAVADO
+task.spawn(function()
+    local stuckTimer = 0
+    while true do
+        task.wait(0.5)
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
+
+            -- Se a vida for 0 mas o personagem continuar "vivo" no Workspace por mais de 1.5s (trava clássica de reset)
+            if humanoid and humanoid.Health <= 0 then
+                stuckTimer = stuckTimer + 0.5
+                if stuckTimer >= 1.5 then
+                    pcall(function()
+                        char:BreakJoints()
+                    end)
+                    stuckTimer = 0
+                end
+            -- Se o boneco perder o HumanoidRootPart ou o Humanoid for destruído pelo jogo para te congelar
+            elseif not humanoid or not root then
+                stuckTimer = stuckTimer + 0.5
+                if stuckTimer >= 2 then
+                    pcall(function()
+                        char:BreakJoints()
+                    end)
+                    stuckTimer = 0
+                end
+            else
+                stuckTimer = 0
+            end
+        end
+    end
+end)
+
 -- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar)
 local filterBox = Instance.new("TextBox")
 filterBox.Size = UDim2.new(1, 0, 0, 28)
@@ -255,7 +290,6 @@ local function trackAndTeleport(userId, btnLabel)
     btnLabel.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 
     task.defer(function()
-        -- Verifica se o player já está no servidor atual instantaneamente
         local inCurrentServer = Players:GetPlayerByUserId(userId)
         if inCurrentServer then
             btnLabel.Text = "✨ Já está aqui!"
@@ -358,7 +392,6 @@ local function loadEnemiesJSON()
             return
         end
 
-        -- Renderiza os botões em lotes suaves para não travar a criação da UI
         for _, enemy in ipairs(enemiesList) do
             local row = Instance.new("Frame")
             row.Name = enemy.name
@@ -415,7 +448,6 @@ filterBox:GetPropertyChangedSignal("Text"):Connect(function()
     enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, visibleCount * 30)
 end)
 
--- Carrega os inimigos ao iniciar de forma limpa
 loadEnemiesJSON()
 
 -- Eventos de controles padrões
@@ -474,7 +506,6 @@ returnButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Monitoramento de posição para o botão Voltar
 local lastPos = nil
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
@@ -711,7 +742,7 @@ task.spawn(function()
                         if not character or not rootPart then break end
                         
                         pcall(function()
-                            targetRoot.CanCollide = type(targetRoot) == "userdata" and true or true
+                            targetRoot.CanCollide = true
                             for _, part in ipairs(targetChar:GetChildren()) do
                                 if part:IsA("BasePart") then part.CanCollide = true end
                             end
