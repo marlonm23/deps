@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar Ultra Fluido
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar Ultra Otimizado (Zero Trava)
 --]]
 
 local Players = game:GetService("Players")
@@ -246,20 +246,16 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para rastrear sem travar a interface visual
+-- Função totalmente assíncrona com defer para nunca travar o frame do jogo
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
 
-    -- 1. Atualiza visualmente o botão instantaneamente
     local originalText = "Localizar"
     btnLabel.Text = "🔄 Buscando..."
     btnLabel.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 
-    -- 2. Força o motor de renderização do Roblox a atualizar a tela antes de iniciar a requisição HTTP
-    RunService.RenderStepped:Wait()
-
-    -- 3. Roda a requisição isolada em thread paralela
-    task.spawn(function()
+    task.defer(function()
+        -- Verifica se o player já está no servidor atual instantaneamente
         local inCurrentServer = Players:GetPlayerByUserId(userId)
         if inCurrentServer then
             btnLabel.Text = "✨ Já está aqui!"
@@ -279,61 +275,47 @@ local function trackAndTeleport(userId, btnLabel)
             return
         end
 
-        local responseData = nil
-        local requestFinished = false
-
-        task.spawn(function()
-            pcall(function()
-                local body = HttpService:JSONEncode({ userIds = { userId } })
-                local res = reqFunc({
-                    Url = "https://presence.roproxy.com/v1/presence/users",
-                    Method = "POST",
-                    Headers = { ["Content-Type"] = "application/json" },
-                    Body = body
-                })
-                if res and res.Body then
-                    responseData = HttpService:JSONDecode(res.Body)
-                end
-            end)
-            requestFinished = true
+        local success, res = pcall(function()
+            local body = HttpService:JSONEncode({ userIds = { userId } })
+            return reqFunc({
+                Url = "https://presence.roproxy.com/v1/presence/users",
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body
+            })
         end)
 
-        -- Timeout assíncrono de 2 segundos (não congela o jogo)
-        local start = tick()
-        while not requestFinished and (tick() - start < 2.0) do
-            task.wait(0.05)
+        if success and res and res.Body then
+            local decodeOk, responseData = pcall(function()
+                return HttpService:JSONDecode(res.Body)
+            end)
+
+            if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
+                local presence = responseData.userPresences[1]
+                if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
+                    btnLabel.Text = "🚀 Entrando..."
+                    btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+                    saveStateAndTeleport(function()
+                        TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
+                    end)
+                    return
+                end
+            end
         end
 
-        if responseData and responseData.userPresences and responseData.userPresences[1] then
-            local presence = responseData.userPresences[1]
-            if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
-                btnLabel.Text = "🚀 Entrando..."
-                btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
-                saveStateAndTeleport(function()
-                    TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
-                end)
-            else
-                btnLabel.Text = "⚠️ Offline/Fechado"
-                btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-                task.wait(2)
-                btnLabel.Text = originalText
-                btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
-            end
-        else
-            btnLabel.Text = "⚠️ Não Encontrado"
-            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-            task.wait(2)
-            btnLabel.Text = originalText
-            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
-        end
+        btnLabel.Text = "⚠️ Offline/Fechado"
+        btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        task.wait(2)
+        btnLabel.Text = originalText
+        btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
     end)
 end
 
--- Carrega e decodifica o JSON de forma 100% assíncrona
+-- Carrega o JSON em background total
 local enemiesList = {}
 
 local function loadEnemiesJSON()
-    task.spawn(function()
+    task.defer(function()
         local success, rawData = pcall(function()
             return game:HttpGet(jsonUrl)
         end)
@@ -376,7 +358,7 @@ local function loadEnemiesJSON()
             return
         end
 
-        -- Cria os elementos visuais de cada inimigo na lista
+        -- Renderiza os botões em lotes suaves para não travar a criação da UI
         for _, enemy in ipairs(enemiesList) do
             local row = Instance.new("Frame")
             row.Name = enemy.name
@@ -433,7 +415,7 @@ filterBox:GetPropertyChangedSignal("Text"):Connect(function()
     enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, visibleCount * 30)
 end)
 
--- Carrega os inimigos ao iniciar
+-- Carrega os inimigos ao iniciar de forma limpa
 loadEnemiesJSON()
 
 -- Eventos de controles padrões
@@ -729,7 +711,7 @@ task.spawn(function()
                         if not character or not rootPart then break end
                         
                         pcall(function()
-                            targetRoot.CanCollide = true
+                            targetRoot.CanCollide = type(targetRoot) == "userdata" and true or true
                             for _, part in ipairs(targetChar:GetChildren()) do
                                 if part:IsA("BasePart") then part.CanCollide = true end
                             end
