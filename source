@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Prensa Hidráulica Vertical + Inimigos JSON + Anti-Fling + Avatar Matcher
+    Script: Mass Walkfling + Prensa Hidráulica + CFrame Lock (Colagem Direta) + Inimigos JSON + Anti-Fling
 --]]
 
 local Players = game:GetService("Players")
@@ -580,7 +580,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Pressão Vertical (Bypass Anti-Fling Infinite Yield por Compressão de Blocos)
+-- Loop de Pressão Vertical de Blocos
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -612,7 +612,6 @@ task.spawn(function()
             if targetPart then
                 local targetPos = targetPart.Position
                 
-                -- Pega blocos do cenário e cria uma força de prensa esmagando de cima para baixo
                 for _, part in ipairs(Workspace:GetDescendants()) do
                     if not throwPartsActive then break end
                     
@@ -630,12 +629,9 @@ task.spawn(function()
                             if not isCharacterPart then
                                 pcall(function()
                                     part.CanCollide = true
-                                    -- Densidade absurda para o bloco agir como uma prensa hidráulica pesada
                                     part.CustomPhysicalProperties = PhysicalProperties.new(100000, 0, 1, 0, 1)
-                                    
-                                    -- Força direcionada estritamente para baixo (esmagando contra o chão)
                                     part.AssemblyLinearVelocity = Vector3.new(0, -500, 0)
-                                    part.AssemblyAngularVelocity = Vector3.new(0, 0, 0) -- Sem rotação para não disparar o Anti-Fling do IY
+                                    part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                                 end)
                             end
                         end
@@ -647,7 +643,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling de Alta Massa com Interseção
+-- Loop de Colagem e Ejeção Direta de Coordenadas (CFrame Lock)
 task.spawn(function()
     while true do
         if not flingActive then
@@ -657,79 +653,39 @@ task.spawn(function()
 
         local character = LocalPlayer.Character
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
-        if not rootPart or not humanoid or humanoid.Health <= 0 then
+        if not rootPart then
             task.wait(0.5)
             continue
         end
 
-        for _, part in ipairs(character:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = PhysicalProperties.new(50000, 0, 1, 0, 1)
-            end
-        end
-
+        local targetChar = nil
         if todosActive then
-            local targets = {}
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character and isValidTarget(player.Character) then
-                    table.insert(targets, player.Character)
+            local validPlayers = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
+                    table.insert(validPlayers, p.Character)
                 end
             end
-
-            if #targets > 0 then
-                for _, targetChar in ipairs(targets) do
-                    if not flingActive or not todosActive then break end
-                    local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
-                    if targetPart and isValidTarget(targetChar) then
-                        local startTick = tick()
-                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.15) do
-                            character = LocalPlayer.Character
-                            rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                            if not character or not rootPart then break end
-
-                            pcall(function()
-                                targetPart.CanCollide = true
-                            end)
-
-                            rootPart.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, -2.5, 0))
-                            rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetPart.CFrame.LookVector * 20000)
-                            rootPart.AssemblyAngularVelocity = Vector3.new(25000, 25000, 25000)
-
-                            RunService.Heartbeat:Wait()
-                        end
-                    end
-                end
-            else
-                task.wait(0.5)
+            if #validPlayers > 0 then
+                targetChar = validPlayers[math.random(1, #validPlayers)]
             end
         else
             local targetPlayer = getTargetPlayer()
             if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
-                local targetChar = targetPlayer.Character
-                local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
-                
-                if targetPart then
-                    while flingActive and not todosActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
-                        character = LocalPlayer.Character
-                        rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                        if not character or not rootPart then break end
-                        
-                        pcall(function()
-                            targetPart.CanCollide = true
-                        end)
-                        
-                        rootPart.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, -2.5, 0))
-                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetPart.CFrame.LookVector * 20000)
-                        rootPart.AssemblyAngularVelocity = Vector3.new(25000, 25000, 25000)
-                        
-                        RunService.Heartbeat:Wait()
-                    end
-                end
-            else
-                task.wait(0.5)
+                targetChar = targetPlayer.Character
             end
         end
+
+        if targetChar then
+            local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso")
+            if targetRoot then
+                pcall(function()
+                    rootPart.CFrame = targetRoot.CFrame
+                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 500, 0)
+                end)
+            end
+        end
+        RunService.Heartbeat:Wait()
     end
 end)
