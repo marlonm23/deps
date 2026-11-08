@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Smart Server Hop (Fica no server e só muda ao achar) + Auto-Reset Cajado de Vinhas
+    Script: Mass Walkfling + Jogar Blocos Pretos + Tracker via RoProxy API + Auto-Reset Efeito Verde
 --]]
 
 local Players = game:GetService("Players")
@@ -10,7 +10,6 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Recupera dados salvos se veio de um teleporte recente
 local savedConfig = _G.MassFlingConfig or {
     flingActive = false,
     todosActive = false,
@@ -18,8 +17,7 @@ local savedConfig = _G.MassFlingConfig or {
     invisibleActive = false,
     throwPartsActive = false,
     targetText = "",
-    searchTargetText = "",
-    serverHopSearching = false
+    searchTargetText = ""
 }
 
 local flingActive = savedConfig.flingActive
@@ -27,7 +25,6 @@ local todosActive = savedConfig.todosActive
 local antiFlingActive = savedConfig.antiFlingActive
 local invisibleActive = savedConfig.invisibleActive
 local throwPartsActive = savedConfig.throwPartsActive
-local serverHopSearching = savedConfig.serverHopSearching
 
 local preTeleportPos = nil
 local scriptUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source"
@@ -46,14 +43,13 @@ local function saveStateAndTeleport(teleportFunction)
                 invisibleActive = %s,
                 throwPartsActive = %s,
                 targetText = %q,
-                searchTargetText = %q,
-                serverHopSearching = %s
+                searchTargetText = %q
             }
             loadstring(game:HttpGet(%q))()
         ]], 
         tostring(flingActive), tostring(todosActive), tostring(antiFlingActive), 
         tostring(invisibleActive), tostring(throwPartsActive), targetVal, 
-        searchVal, tostring(serverHopSearching), scriptUrl)
+        searchVal, scriptUrl)
 
         pcall(function()
             queueteleport(codeToQueue)
@@ -71,7 +67,7 @@ screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
--- Janela Principal (Design Profissional Escuro)
+-- Interface Principal
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 210, 0, 360)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
@@ -83,7 +79,7 @@ mainFrame.Parent = screenGui
 
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
--- Barra Superior / Título
+-- Topbar
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
@@ -107,7 +103,7 @@ titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.Text = "⚡ Hub Principal"
 titleLabel.Parent = topBar
 
--- Sistema de Abas Profissional
+-- Sistema de Abas
 local tabContainer = Instance.new("Frame")
 tabContainer.Size = UDim2.new(1, -16, 0, 28)
 tabContainer.Position = UDim2.new(0, 8, 0, 38)
@@ -134,11 +130,11 @@ tab2Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
 tab2Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
 tab2Btn.TextSize = 11
 tab2Btn.Font = Enum.Font.SourceSansBold
-tab2Btn.Text = "Procurar Servidor"
+tab2Btn.Text = "Procurar Player"
 tab2Btn.Parent = tabContainer
 Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 6)
 
--- Containers das Abas
+-- Containers
 local tab1Content = Instance.new("ScrollingFrame")
 tab1Content.Size = UDim2.new(1, -16, 1, -78)
 tab1Content.Position = UDim2.new(0, 8, 0, 72)
@@ -156,7 +152,6 @@ tab2Content.BackgroundTransparency = 1
 tab2Content.Visible = false
 tab2Content.Parent = mainFrame
 
--- Alternar Abas
 tab1Btn.MouseButton1Click:Connect(function()
     tab1Content.Visible = true
     tab2Content.Visible = false
@@ -175,7 +170,6 @@ tab2Btn.MouseButton1Click:Connect(function()
     tab1Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
 end)
 
--- ELEMENTOS ABA 1 (Controles)
 local function createButton(parent, text, posY, color)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 30)
@@ -218,7 +212,7 @@ local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar B
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
 
--- ELEMENTOS ABA 2 (Procurar em Servidores)
+-- ELEMENTOS ABA 2 (Tracker via RoProxy API)
 local searchDesc = Instance.new("TextLabel")
 searchDesc.Size = UDim2.new(1, 0, 0, 35)
 searchDesc.Position = UDim2.new(0, 0, 0, 5)
@@ -227,7 +221,7 @@ searchDesc.TextColor3 = Color3.fromRGB(180, 180, 190)
 searchDesc.TextSize = 11
 searchDesc.Font = Enum.Font.SourceSans
 searchDesc.TextWrapped = true
-searchDesc.Text = "Busca o servidor onde o alvo está sem sair do seu servidor atual:"
+searchDesc.Text = "Digite o nome de usuário exato para rastrear o servidor via RoProxy API:"
 searchDesc.Parent = tab2Content
 
 local searchTargetBox = Instance.new("TextBox")
@@ -236,7 +230,7 @@ searchTargetBox.Position = UDim2.new(0, 0, 0, 45)
 searchTargetBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
 searchTargetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 searchTargetBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
-searchTargetBox.PlaceholderText = "Nome exato ou parcial..."
+searchTargetBox.PlaceholderText = "Username do jogador..."
 searchTargetBox.Text = savedConfig.searchTargetText or ""
 searchTargetBox.TextSize = 12
 searchTargetBox.Font = Enum.Font.SourceSans
@@ -247,10 +241,21 @@ searchTargetBox:GetPropertyChangedSignal("Text"):Connect(function()
     savedConfig.searchTargetText = searchTargetBox.Text
 end)
 
-local hopStatusButton = createButton(tab2Content, serverHopSearching and "Procurar em Servidores: ON" or "Procurar em Servidores: OFF", 85, serverHopSearching and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(60, 60, 70))
+local searchStatusLabel = Instance.new("TextLabel")
+searchStatusLabel.Size = UDim2.new(1, 0, 0, 35)
+searchStatusLabel.Position = UDim2.new(0, 0, 0, 82)
+searchStatusLabel.BackgroundTransparency = 1
+searchStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+searchStatusLabel.TextSize = 11
+searchStatusLabel.Font = Enum.Font.SourceSansBold
+searchStatusLabel.TextWrapped = true
+searchStatusLabel.Text = "Status: Aguardando nome..."
+searchStatusLabel.Parent = tab2Content
+
+local trackButton = createButton(tab2Content, "Rastrear e Entrar no Servidor", 125, Color3.fromRGB(45, 120, 220))
 
 
--- Eventos de cliques e lógica
+-- Lógica de botões
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -298,12 +303,6 @@ rejoinButton.MouseButton1Click:Connect(function()
     end)
 end)
 
-hopStatusButton.MouseButton1Click:Connect(function()
-    serverHopSearching = not serverHopSearching
-    hopStatusButton.Text = serverHopSearching and "Procurar em Servidores: ON" or "Procurar em Servidores: OFF"
-    hopStatusButton.BackgroundColor3 = serverHopSearching and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(60, 60, 70)
-end)
-
 returnButton.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -312,7 +311,76 @@ returnButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Monitoramento de Teleporte
+-- RASTREADOR VIA API RO-PROXY
+trackButton.MouseButton1Click:Connect(function()
+    local username = searchTargetBox.Text:gsub("%s+", "")
+    if username == "" then
+        searchStatusLabel.Text = "Status: Digite um nome válido!"
+        searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+        return
+    end
+
+    searchStatusLabel.Text = "Status: Buscando UserId de " .. username .. "..."
+    searchStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+
+    task.spawn(function()
+        local userId = nil
+        pcall(function()
+            userId = Players:GetUserIdFromNameAsync(username)
+        end)
+
+        if not userId then
+            searchStatusLabel.Text = "Status: Jogador não encontrado no Roblox!"
+            searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+            return
+        end
+
+        -- Verifica se o jogador está no mesmo servidor atual
+        local inCurrentServer = Players:GetPlayerByUserId(userId)
+        if inCurrentServer then
+            searchStatusLabel.Text = "Status: O jogador já está neste servidor!"
+            searchStatusLabel.TextColor3 = Color3.fromRGB(50, 220, 50)
+            return
+        end
+
+        searchStatusLabel.Text = "Status: Consultando Presença via RoProxy API..."
+        
+        local success, response = pcall(function()
+            local body = HttpService:JSONEncode({ userIds = { userId } })
+            local res = request({
+                Url = "https://presence.roproxy.com/v1/presence/users",
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body
+            })
+            return HttpService:JSONDecode(res.Body)
+        end)
+
+        if success and response and response.userPresences and response.userPresences[1] then
+            local presence = response.userPresences[1]
+            local userState = presence.userPresenceType
+            local targetJobId = presence.gameId
+            local targetPlaceId = presence.placeId
+
+            if userState == 2 and targetJobId and targetJobId ~= "" then
+                searchStatusLabel.Text = "Status: Servidor achado! Teleportando..."
+                searchStatusLabel.TextColor3 = Color3.fromRGB(50, 220, 50)
+                
+                saveStateAndTeleport(function()
+                    TeleportService:TeleportToPlaceInstance(targetPlaceId or game.PlaceId, targetJobId, LocalPlayer)
+                end)
+            else
+                searchStatusLabel.Text = "Status: Jogador offline ou privacidade fechada para entrar!"
+                searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+            end
+        else
+            searchStatusLabel.Text = "Status: Erro ao consultar a API do Roblox."
+            searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+        end
+    end)
+end)
+
+-- Teleport tracker pos
 local lastPos = nil
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
@@ -328,35 +396,49 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- AUTO-RESET: Cajado de Vinhas
+-- DETECTOR DE EFEITO VERDE / CAJADO DE VINHAS (SEM RESET FALSO)
 task.spawn(function()
     while true do
-        task.wait(0.2)
+        task.wait(0.15)
         local char = LocalPlayer.Character
         if char then
             local root = char:FindFirstChild("HumanoidRootPart")
             local humanoid = char:FindFirstChildOfClass("Humanoid")
             if root and humanoid and humanoid.Health > 0 then
-                local pego = false
-                for _, child in ipairs(char:GetDescendants()) do
-                    if child:IsA("BasePart") then
-                        local n = child.Name:lower()
-                        if n:find("vinha") or n:find("vine") or n:find("root") or n:find("raiz") or n:find("trap") then
-                            pego = true
+                local pegoPelasVinhas = false
+
+                -- 1. Detecta Highlight/Efeito Verde ou seleção anexada ao personagem
+                for _, obj in ipairs(char:GetChildren()) do
+                    if obj:IsA("Highlight") or obj:IsA("SelectionBox") then
+                        local c = obj.FillColor or obj.OutlineColor or obj.Color3
+                        if c and (c.G > 0.6 and c.R < 0.4) then -- Cor verde
+                            pegoPelasVinhas = true
                             break
                         end
-                    elseif child:IsA("WeldConstraint") or child:IsA("Weld") then
-                        if child.Part0 and child.Part1 then
-                            local other = (child.Part0 == root or child.Part0.Parent == char) and child.Part1 or child.Part0
-                            if other and not other:IsDescendantOf(char) and not other:IsDescendantOf(Workspace.Terrain) then
-                                pego = true
+                    elseif obj:IsA("Model") or obj:IsA("Folder") then
+                        local n = obj.Name:lower()
+                        if n:find("vinha") or n:find("vine") or n:find("root") or n:find("raiz") or n:find("trap") then
+                            pegoPelasVinhas = true
+                            break
+                        end
+                    end
+                end
+
+                -- 2. Detecta aprisionamento (Velocidade zerada enquanto atingido por elemento externo)
+                if not pegoPelasVinhas and humanoid.WalkSpeed == 0 then
+                    for _, child in ipairs(Workspace:GetDescendants()) do
+                        if child:IsA("BasePart") and not child:IsDescendantOf(char) and not child:IsDescendantOf(Workspace.Terrain) then
+                            local n = child.Name:lower()
+                            if (n:find("vinha") or n:find("vine") or n:find("root") or n:find("raiz")) and (child.Position - root.Position).Magnitude < 6 then
+                                pegoPelasVinhas = true
                                 break
                             end
                         end
                     end
                 end
-                if pego then
-                    humanoid.Health = 0
+
+                if pegoPelasVinhas then
+                    humanoid.Health = 0 -- Reset instantâneo apenas quando atingido pelas vinhas!
                 end
             end
         end
@@ -383,84 +465,6 @@ local function isValidTarget(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     return targetRoot and humanoid and humanoid.Health > 0
 end
-
--- Varredura inteligente: Fica no server atual verificando a API em massa até achar a pessoa exata
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if serverHopSearching then
-            local query = searchTargetBox.Text:lower()
-            if query ~= "" then
-                -- 1. Primeiro verifica se a pessoa já está no servidor atual
-                local foundHere = false
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer then
-                        local pName, pDisp = player.Name:lower(), player.DisplayName:lower()
-                        if pName:find(query) or pDisp:find(query) then
-                            foundHere = true
-                            break
-                        end
-                    end
-                end
-
-                if foundHere then
-                    hopStatusButton.Text = "Alvo está neste servidor!"
-                    hopStatusButton.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
-                    serverHopSearching = false
-                else
-                    -- 2. Se não está aqui, varre as páginas da API em segundo plano SEM SAIR DO SERVIDOR
-                    hopStatusButton.Text = "Varrendo servidores..."
-                    pcall(function()
-                        local cursor = ""
-                        local targetServerId = nil
-                        
-                        for i = 1, 8 do -- Varre até 8 páginas de servidores (cerca de 800 servidores)
-                            if not serverHopSearching then break end
-                            local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-                            if cursor ~= "" then url = url .. "&cursor=" .. cursor end
-                            
-                            local req = game:HttpGet(url)
-                            local data = HttpService:JSONDecode(req)
-                            if data and data.data then
-                                for _, s in ipairs(data.data) do
-                                    if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
-                                        if s.players then
-                                            for _, p in ipairs(s.players) do
-                                                local n = (p.name or ""):lower()
-                                                local d = (p.displayName or ""):lower()
-                                                if n:find(query) or d:find(query) then
-                                                    targetServerId = s.id
-                                                    break
-                                                end
-                                            end
-                                        end
-                                    end
-                                    if targetServerId then break end
-                                end
-                            end
-                            if targetServerId or not data.nextPageCursor then break end
-                            cursor = data.nextPageCursor
-                            task.wait(0.1)
-                        end
-
-                        -- 3. SÓ MUDA DE SERVIDOR SE ACHAR O ALVO EXATO
-                        if targetServerId then
-                            hopStatusButton.Text = "¡Alvo encontrado! Entrando..."
-                            hopStatusButton.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
-                            serverHopSearching = false
-                            saveStateAndTeleport(function()
-                                TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServerId, LocalPlayer)
-                            end)
-                        else
-                            hopStatusButton.Text = "Não achado, buscando de novo..."
-                            task.wait(3)
-                        end
-                    end)
-                end
-            end
-        end
-    end
-end)
 
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
