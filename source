@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos (Cores da Aba 2) + Rejoin Mesmo Servidor
+    Script: Mass Walkfling + Jogar Blocos Rápido (Com Foco em Alvo/Todos) + Rejoin Mesmo Servidor
 --]]
 
 local Players = game:GetService("Players")
@@ -27,7 +27,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 315)
+mainFrame.Size = UDim2.new(0, 180, 0, 285)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -39,175 +39,85 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Botões de Abas (Topo)
-local tab1Btn = Instance.new("TextButton")
-tab1Btn.Size = UDim2.new(0, 88, 0, 25)
-tab1Btn.Position = UDim2.new(0, 8, 0, 8)
-tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-tab1Btn.TextSize = 12
-tab1Btn.Font = Enum.Font.SourceSansBold
-tab1Btn.Text = "Controles"
-tab1Btn.Parent = mainFrame
-
-local tab1Corner = Instance.new("UICorner")
-tab1Corner.CornerRadius = UDim.new(0, 5)
-tab1Corner.Parent = tab1Btn
-
-local tab2Btn = Instance.new("TextButton")
-tab2Btn.Size = UDim2.new(0, 88, 0, 25)
-tab2Btn.Position = UDim2.new(0, 104, 0, 8)
-tab2Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-tab2Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-tab2Btn.TextSize = 12
-tab2Btn.Font = Enum.Font.SourceSansBold
-tab2Btn.Text = "Cores"
-tab2Btn.Parent = mainFrame
-
-local tab2Corner = Instance.new("UICorner")
-tab2Corner.CornerRadius = UDim.new(0, 5)
-tab2Corner.Parent = tab2Btn
-
--- Container da Aba 1 (Controles)
-local tab1Content = Instance.new("Frame")
-tab1Content.Size = UDim2.new(0, 184, 0, 260)
-tab1Content.Position = UDim2.new(0, 8, 0, 42)
-tab1Content.BackgroundTransparency = 1
-tab1Content.Visible = true
-tab1Content.Parent = mainFrame
-
--- Container da Aba 2 (Cores)
-local tab2Content = Instance.new("Frame")
-tab2Content.Size = UDim2.new(0, 184, 0, 260)
-tab2Content.Position = UDim2.new(0, 8, 0, 42)
-tab2Content.BackgroundTransparency = 1
-tab2Content.Visible = false
-tab2Content.Parent = mainFrame
-
--- Alternar Abas
-tab1Btn.MouseButton1Click:Connect(function()
-    tab1Content.Visible = true
-    tab2Content.Visible = false
-    tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    tab2Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-end)
-
-tab2Btn.MouseButton1Click:Connect(function()
-    tab1Content.Visible = false
-    tab2Content.Visible = true
-    tab2Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    tab1Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-end)
-
--- ELEMENTOS DA ABA 1 (Controles)
 local flingButton = Instance.new("TextButton")
-flingButton.Size = UDim2.new(0, 168, 0, 28)
-flingButton.Position = UDim2.new(0, 8, 0, 5)
+flingButton.Size = UDim2.new(0, 160, 0, 30)
+flingButton.Position = UDim2.new(0, 10, 0, 10)
 flingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flingButton.TextSize = 12
+flingButton.TextSize = 13
 flingButton.Font = Enum.Font.SourceSansBold
 flingButton.Text = "Fling: DESATIVADO"
-flingButton.Parent = tab1Content
+flingButton.Parent = mainFrame
 Instance.new("UICorner", flingButton).CornerRadius = UDim.new(0, 6)
 
 local todosButton = Instance.new("TextButton")
-todosButton.Size = UDim2.new(0, 168, 0, 28)
-todosButton.Position = UDim2.new(0, 8, 0, 38)
+todosButton.Size = UDim2.new(0, 160, 0, 30)
+todosButton.Position = UDim2.new(0, 10, 0, 48)
 todosButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 todosButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-todosButton.TextSize = 12
+todosButton.TextSize = 13
 todosButton.Font = Enum.Font.SourceSansBold
 todosButton.Text = "Todos: DESATIVADO"
-todosButton.Parent = tab1Content
+todosButton.Parent = mainFrame
 Instance.new("UICorner", todosButton).CornerRadius = UDim.new(0, 6)
 
 local antiFlingButton = Instance.new("TextButton")
-antiFlingButton.Size = UDim2.new(0, 168, 0, 28)
-antiFlingButton.Position = UDim2.new(0, 8, 0, 71)
+antiFlingButton.Size = UDim2.new(0, 160, 0, 30)
+antiFlingButton.Position = UDim2.new(0, 10, 0, 86)
 antiFlingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 antiFlingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-antiFlingButton.TextSize = 12
+antiFlingButton.TextSize = 13
 antiFlingButton.Font = Enum.Font.SourceSansBold
 antiFlingButton.Text = "Anti-Fling: OFF"
-antiFlingButton.Parent = tab1Content
+antiFlingButton.Parent = mainFrame
 Instance.new("UICorner", antiFlingButton).CornerRadius = UDim.new(0, 6)
 
 local invisibleButton = Instance.new("TextButton")
-invisibleButton.Size = UDim2.new(0, 168, 0, 28)
-invisibleButton.Position = UDim2.new(0, 8, 0, 104)
+invisibleButton.Size = UDim2.new(0, 160, 0, 30)
+invisibleButton.Position = UDim2.new(0, 10, 0, 124)
 invisibleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 invisibleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-invisibleButton.TextSize = 12
+invisibleButton.TextSize = 13
 invisibleButton.Font = Enum.Font.SourceSansBold
 invisibleButton.Text = "Invisível: OFF"
-invisibleButton.Parent = tab1Content
+invisibleButton.Parent = mainFrame
 Instance.new("UICorner", invisibleButton).CornerRadius = UDim.new(0, 6)
 
 local rejoinButton = Instance.new("TextButton")
-rejoinButton.Size = UDim2.new(0, 168, 0, 28)
-rejoinButton.Position = UDim2.new(0, 8, 0, 137)
+rejoinButton.Size = UDim2.new(0, 160, 0, 30)
+rejoinButton.Position = UDim2.new(0, 10, 0, 162)
 rejoinButton.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
 rejoinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-rejoinButton.TextSize = 12
+rejoinButton.TextSize = 13
 rejoinButton.Font = Enum.Font.SourceSansBold
 rejoinButton.Text = "Rejoin"
-rejoinButton.Parent = tab1Content
+rejoinButton.Parent = mainFrame
 Instance.new("UICorner", rejoinButton).CornerRadius = UDim.new(0, 6)
 
 local targetBox = Instance.new("TextBox")
-targetBox.Size = UDim2.new(0, 168, 0, 28)
-targetBox.Position = UDim2.new(0, 8, 0, 170)
+targetBox.Size = UDim2.new(0, 160, 0, 30)
+targetBox.Position = UDim2.new(0, 10, 0, 200)
 targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
 targetBox.PlaceholderText = "Digite parte do nome..."
 targetBox.Text = ""
-targetBox.TextSize = 12
+targetBox.TextSize = 13
 targetBox.Font = Enum.Font.SourceSans
-targetBox.Parent = tab1Content
+targetBox.Parent = mainFrame
 Instance.new("UICorner", targetBox).CornerRadius = UDim.new(0, 6)
 
 local throwPartsButton = Instance.new("TextButton")
-throwPartsButton.Size = UDim2.new(0, 168, 0, 28)
-throwPartsButton.Position = UDim2.new(0, 8, 0, 203)
+throwPartsButton.Size = UDim2.new(0, 160, 0, 30)
+throwPartsButton.Position = UDim2.new(0, 10, 0, 238)
 throwPartsButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 throwPartsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-throwPartsButton.TextSize = 12
+throwPartsButton.TextSize = 13
 throwPartsButton.Font = Enum.Font.SourceSansBold
 throwPartsButton.Text = "Jogar Blocos: OFF"
-throwPartsButton.Parent = tab1Content
+throwPartsButton.Parent = mainFrame
 Instance.new("UICorner", throwPartsButton).CornerRadius = UDim.new(0, 6)
 
-
--- ELEMENTOS DA ABA 2 (Cores dos Blocos)
-local clearColorsButton = Instance.new("TextButton")
-clearColorsButton.Size = UDim2.new(0, 168, 0, 28)
-clearColorsButton.Position = UDim2.new(0, 8, 0, 5)
-clearColorsButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-clearColorsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearColorsButton.TextSize = 12
-clearColorsButton.Font = Enum.Font.SourceSansBold
-clearColorsButton.Text = "Limpar Lista de Cores"
-clearColorsButton.Parent = tab2Content
-Instance.new("UICorner", clearColorsButton).CornerRadius = UDim.new(0, 6)
-
-local colorsScroll = Instance.new("ScrollingFrame")
-colorsScroll.Size = UDim2.new(0, 168, 0, 215)
-colorsScroll.Position = UDim2.new(0, 8, 0, 38)
-colorsScroll.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-colorsScroll.BorderSizePixel = 0
-colorsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-colorsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-colorsScroll.Parent = tab2Content
-Instance.new("UICorner", colorsScroll).CornerRadius = UDim.new(0, 6)
-
-local colorsListLayout = Instance.new("UIListLayout")
-colorsListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-colorsListLayout.Padding = UDim.new(0, 4)
-colorsListLayout.Parent = colorsScroll
-
--- Lógica dos Botões da Aba 1
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -218,7 +128,6 @@ todosButton.MouseButton1Click:Connect(function()
     todosActive = not todosActive
     todosButton.Text = todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO"
     todosButton.BackgroundColor3 = todosActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
-    targetBox.Visible = not todosActive
 end)
 
 antiFlingButton.MouseButton1Click:Connect(function()
@@ -247,7 +156,6 @@ throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
--- Rejoin corrigido para o MESMO servidor (JobId)
 rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
@@ -282,58 +190,6 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- Botão Limpar Cores
-clearColorsButton.MouseButton1Click:Connect(function()
-    for _, child in ipairs(colorsScroll:GetChildren()) do
-        if child:IsA("TextLabel") then
-            child:Destroy()
-        end
-    end
-end)
-
--- Tabela global para armazenar as cores que aparecem na aba 2
-local loggedColors = {}
-
--- Rastreador de Cores de Blocos (Aba 2)
-task.spawn(function()
-    while true do
-        task.wait(1)
-        pcall(function()
-            for _, part in ipairs(Workspace:GetDescendants()) do
-                if part:IsA("BasePart") and not part.Anchored then
-                    local isChar = false
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p.Character and part:IsDescendantOf(p.Character) then
-                            isChar = true
-                            break
-                        end
-                    end
-
-                    if not isChar then
-                        local bColor = tostring(part.BrickColor)
-                        local color3 = part.Color
-                        local colorKey = bColor .. string.format(" (R:%d G:%d B:%d)", math.floor(color3.R*255), math.floor(color3.G*255), math.floor(color3.B*255))
-                        
-                        if not loggedColors[colorKey] then
-                            loggedColors[colorKey] = true
-                            
-                            local colorLabel = Instance.new("TextLabel")
-                            colorLabel.Size = UDim2.new(1, -10, 0, 22)
-                            colorLabel.BackgroundTransparency = 1
-                            colorLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-                            colorLabel.TextSize = 11
-                            colorLabel.Font = Enum.Font.Code
-                            colorLabel.TextXAlignment = Enum.TextXAlignment.Left
-                            colorLabel.Text = colorKey
-                            colorLabel.Parent = colorsScroll
-                        end
-                    end
-                end
-            end
-        end)
-    end
-end)
-
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
         pcall(function()
@@ -352,7 +208,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso (Move qualquer cor que apareceu e foi registrada na Aba 2)
+-- Loop de Arremesso Rápido e Focado
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -394,26 +250,19 @@ task.spawn(function()
                     end
 
                     if not isCharacterPart then
-                        local bColor = tostring(part.BrickColor)
-                        local color3 = part.Color
-                        local colorKey = bColor .. string.format(" (R:%d G:%d B:%d)", math.floor(color3.R*255), math.floor(color3.G*255), math.floor(color3.B*255))
-
-                        -- Move se a cor já apareceu e está registrada na lista da aba 2
-                        if loggedColors[colorKey] then
-                            pcall(function()
-                                part.CanCollide = true
-                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
-                                
-                                local direction = (targetRoot.Position - part.Position).Unit
-                                part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
-                                part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
-                            end)
-                        end
+                        pcall(function()
+                            part.CanCollide = true
+                            part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                            
+                            local direction = (targetRoot.Position - part.Position).Unit
+                            part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
+                            part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
+                        end)
                     end
                 end
             end
         end
-        task.wait(0.1)
+        task.wait(0.02) -- Velocidade aumentada consideravelmente
     end
 end)
 
