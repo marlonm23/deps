@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Tracker via RoProxy API + Auto-Reset Efeito Verde
+    Script: Mass Walkfling + Jogar Blocos Pretos + Tracker Direto por UserId + Auto-Reset Efeito Verde
 --]]
 
 local Players = game:GetService("Players")
@@ -17,7 +17,7 @@ local savedConfig = _G.MassFlingConfig or {
     invisibleActive = false,
     throwPartsActive = false,
     targetText = "",
-    searchTargetText = ""
+    searchUserIdText = ""
 }
 
 local flingActive = savedConfig.flingActive
@@ -33,7 +33,7 @@ local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (f
 local function saveStateAndTeleport(teleportFunction)
     if queueteleport then
         local targetVal = targetBox and targetBox.Text or savedConfig.targetText
-        local searchVal = searchTargetBox and searchTargetBox.Text or savedConfig.searchTargetText
+        local searchVal = searchUserIdBox and searchUserIdBox.Text or savedConfig.searchUserIdText
         
         local codeToQueue = string.format([[
             _G.MassFlingConfig = {
@@ -43,7 +43,7 @@ local function saveStateAndTeleport(teleportFunction)
                 invisibleActive = %s,
                 throwPartsActive = %s,
                 targetText = %q,
-                searchTargetText = %q
+                searchUserIdText = %q
             }
             loadstring(game:HttpGet(%q))()
         ]], 
@@ -130,7 +130,7 @@ tab2Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
 tab2Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
 tab2Btn.TextSize = 11
 tab2Btn.Font = Enum.Font.SourceSansBold
-tab2Btn.Text = "Procurar Player"
+tab2Btn.Text = "Tracker (UserId)"
 tab2Btn.Parent = tabContainer
 Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 6)
 
@@ -211,8 +211,7 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
-
--- ELEMENTOS ABA 2 (Tracker via RoProxy API)
+-- ELEMENTOS ABA 2 (Tracker via UserId)
 local searchDesc = Instance.new("TextLabel")
 searchDesc.Size = UDim2.new(1, 0, 0, 35)
 searchDesc.Position = UDim2.new(0, 0, 0, 5)
@@ -221,24 +220,24 @@ searchDesc.TextColor3 = Color3.fromRGB(180, 180, 190)
 searchDesc.TextSize = 11
 searchDesc.Font = Enum.Font.SourceSans
 searchDesc.TextWrapped = true
-searchDesc.Text = "Digite o nome de usuário exato para rastrear o servidor via RoProxy API:"
+searchDesc.Text = "Digite o UserId numérico do jogador para entrar no servidor dele:"
 searchDesc.Parent = tab2Content
 
-local searchTargetBox = Instance.new("TextBox")
-searchTargetBox.Size = UDim2.new(1, 0, 0, 32)
-searchTargetBox.Position = UDim2.new(0, 0, 0, 45)
-searchTargetBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
-searchTargetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-searchTargetBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
-searchTargetBox.PlaceholderText = "Username do jogador..."
-searchTargetBox.Text = savedConfig.searchTargetText or ""
-searchTargetBox.TextSize = 12
-searchTargetBox.Font = Enum.Font.SourceSans
-searchTargetBox.Parent = tab2Content
-Instance.new("UICorner", searchTargetBox).CornerRadius = UDim.new(0, 6)
+local searchUserIdBox = Instance.new("TextBox")
+searchUserIdBox.Size = UDim2.new(1, 0, 0, 32)
+searchUserIdBox.Position = UDim2.new(0, 0, 0, 45)
+searchUserIdBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+searchUserIdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+searchUserIdBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
+searchUserIdBox.PlaceholderText = "Ex: 12345678"
+searchUserIdBox.Text = savedConfig.searchUserIdText or ""
+searchUserIdBox.TextSize = 12
+searchUserIdBox.Font = Enum.Font.SourceSans
+searchUserIdBox.Parent = tab2Content
+Instance.new("UICorner", searchUserIdBox).CornerRadius = UDim.new(0, 6)
 
-searchTargetBox:GetPropertyChangedSignal("Text"):Connect(function()
-    savedConfig.searchTargetText = searchTargetBox.Text
+searchUserIdBox:GetPropertyChangedSignal("Text"):Connect(function()
+    savedConfig.searchUserIdText = searchUserIdBox.Text
 end)
 
 local searchStatusLabel = Instance.new("TextLabel")
@@ -249,13 +248,12 @@ searchStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
 searchStatusLabel.TextSize = 11
 searchStatusLabel.Font = Enum.Font.SourceSansBold
 searchStatusLabel.TextWrapped = true
-searchStatusLabel.Text = "Status: Aguardando nome..."
+searchStatusLabel.Text = "Status: Aguardando UserId..."
 searchStatusLabel.Parent = tab2Content
 
-local trackButton = createButton(tab2Content, "Rastrear e Entrar no Servidor", 125, Color3.fromRGB(45, 120, 220))
+local trackButton = createButton(tab2Content, "Rastrear e Entrar", 125, Color3.fromRGB(45, 120, 220))
 
-
--- Lógica de botões
+-- Eventos
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -311,31 +309,21 @@ returnButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- RASTREADOR VIA API RO-PROXY
+-- RASTREADOR DIRETO VIA USERID
 trackButton.MouseButton1Click:Connect(function()
-    local username = searchTargetBox.Text:gsub("%s+", "")
-    if username == "" then
-        searchStatusLabel.Text = "Status: Digite um nome válido!"
+    local inputId = searchUserIdBox.Text:gsub("%s+", "")
+    local userId = tonumber(inputId)
+    
+    if not userId then
+        searchStatusLabel.Text = "Status: Digite um UserId numérico válido!"
         searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
         return
     end
 
-    searchStatusLabel.Text = "Status: Buscando UserId de " .. username .. "..."
+    searchStatusLabel.Text = "Status: Verificando jogador no servidor atual..."
     searchStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
 
     task.spawn(function()
-        local userId = nil
-        pcall(function()
-            userId = Players:GetUserIdFromNameAsync(username)
-        end)
-
-        if not userId then
-            searchStatusLabel.Text = "Status: Jogador não encontrado no Roblox!"
-            searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
-            return
-        end
-
-        -- Verifica se o jogador está no mesmo servidor atual
         local inCurrentServer = Players:GetPlayerByUserId(userId)
         if inCurrentServer then
             searchStatusLabel.Text = "Status: O jogador já está neste servidor!"
@@ -343,11 +331,18 @@ trackButton.MouseButton1Click:Connect(function()
             return
         end
 
-        searchStatusLabel.Text = "Status: Consultando Presença via RoProxy API..."
+        searchStatusLabel.Text = "Status: Consultando Presença via API..."
         
+        local reqFunc = (syn and syn.request) or (http and http.request) or request or http_request
+        if not reqFunc then
+            searchStatusLabel.Text = "Status: Executor sem suporte a http request!"
+            searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+            return
+        end
+
         local success, response = pcall(function()
             local body = HttpService:JSONEncode({ userIds = { userId } })
-            local res = request({
+            local res = reqFunc({
                 Url = "https://presence.roproxy.com/v1/presence/users",
                 Method = "POST",
                 Headers = { ["Content-Type"] = "application/json" },
@@ -370,17 +365,17 @@ trackButton.MouseButton1Click:Connect(function()
                     TeleportService:TeleportToPlaceInstance(targetPlaceId or game.PlaceId, targetJobId, LocalPlayer)
                 end)
             else
-                searchStatusLabel.Text = "Status: Jogador offline ou privacidade fechada para entrar!"
+                searchStatusLabel.Text = "Status: Offline, em outro jogo ou privacidade fechada!"
                 searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
             end
         else
-            searchStatusLabel.Text = "Status: Erro ao consultar a API do Roblox."
+            searchStatusLabel.Text = "Status: Falha na requisição da API."
             searchStatusLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
         end
     end)
 end)
 
--- Teleport tracker pos
+-- Monitoramento de posição para o botão Voltar
 local lastPos = nil
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
@@ -396,7 +391,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- DETECTOR DE EFEITO VERDE / CAJADO DE VINHAS (SEM RESET FALSO)
+-- DETECTOR DE EFEITO VERDE / CAJADO DE VINHAS
 task.spawn(function()
     while true do
         task.wait(0.15)
@@ -407,11 +402,10 @@ task.spawn(function()
             if root and humanoid and humanoid.Health > 0 then
                 local pegoPelasVinhas = false
 
-                -- 1. Detecta Highlight/Efeito Verde ou seleção anexada ao personagem
                 for _, obj in ipairs(char:GetChildren()) do
                     if obj:IsA("Highlight") or obj:IsA("SelectionBox") then
                         local c = obj.FillColor or obj.OutlineColor or obj.Color3
-                        if c and (c.G > 0.6 and c.R < 0.4) then -- Cor verde
+                        if c and (c.G > 0.6 and c.R < 0.4) then
                             pegoPelasVinhas = true
                             break
                         end
@@ -424,7 +418,6 @@ task.spawn(function()
                     end
                 end
 
-                -- 2. Detecta aprisionamento (Velocidade zerada enquanto atingido por elemento externo)
                 if not pegoPelasVinhas and humanoid.WalkSpeed == 0 then
                     for _, child in ipairs(Workspace:GetDescendants()) do
                         if child:IsA("BasePart") and not child:IsDescendantOf(char) and not child:IsDescendantOf(Workspace.Terrain) then
@@ -438,7 +431,7 @@ task.spawn(function()
                 end
 
                 if pegoPelasVinhas then
-                    humanoid.Health = 0 -- Reset instantâneo apenas quando atingido pelas vinhas!
+                    humanoid.Health = 0
                 end
             end
         end
