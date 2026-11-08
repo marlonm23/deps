@@ -63,7 +63,7 @@ end
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = screenGui
+screenGui.Parent = PlayerGui
 
 -- Janela Principal
 local mainFrame = Instance.new("Frame")
