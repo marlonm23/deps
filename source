@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Artilharia Pesada de Blocos Pretos + Inimigos JSON + Anti-Fling + Avatar Matcher
+    Script: Mass Walkfling + Artilharia Pesada + Inimigos JSON + Anti-Fling + Anti-Freeze (Quebra de Ancoragem)
 --]]
 
 local Players = game:GetService("Players")
@@ -245,6 +245,25 @@ statusCsvLabel.TextSize = 11
 statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
+
+-- Função para forçar a quebra de ancoragem (Anti-Freeze)
+local function breakEnemyFreeze(targetChar)
+    if not targetChar then return end
+    pcall(function()
+        for _, part in ipairs(targetChar:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Anchored = false
+                part.CanCollide = true
+                part.CustomPhysicalProperties = PhysicalProperties.new(10000, 0, 1, 0, 1)
+            end
+        end
+        local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.Sit = false
+        end
+    end)
+end
 
 local function getTargetHitParts(character)
     local parts = {}
@@ -602,7 +621,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Artilharia Pesada: Blocos Pretos com Massa e Velocidade Extrema
+-- Loop de Artilharia Pesada com Quebra de Ancoragem (Anti-Freeze)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -629,6 +648,7 @@ task.spawn(function()
         end
 
         if targetChar then
+            breakEnemyFreeze(targetChar)
             local hitParts = getTargetHitParts(targetChar)
             
             if #hitParts > 0 then
@@ -652,8 +672,7 @@ task.spawn(function()
                                 local selectedHitPart = hitParts[math.random(1, #hitParts)]
                                 pcall(function()
                                     part.CanCollide = true
-                                    -- Massa extrema para quebrar qualquer script ancorado ou de defesa
-                                    part.CustomPhysicalProperties = PhysicalProperties.new(1000, 0, 1, 0, 1)
+                                    part.CustomPhysicalProperties = PhysicalProperties.new(10000, 0, 1, 0, 1)
                                     
                                     local direction = (selectedHitPart.Position - part.Position).Unit
                                     part.AssemblyLinearVelocity = direction * 1000 + Vector3.new(0, 200, 0)
@@ -669,7 +688,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Padrão de Alta Massa
+-- Loop Fling Padrão de Alta Massa com Quebra de Ancoragem
 task.spawn(function()
     while true do
         if not flingActive then
@@ -688,7 +707,7 @@ task.spawn(function()
 
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = PhysicalProperties.new(1000, 0, 1, 0, 1)
+                part.CustomPhysicalProperties = PhysicalProperties.new(10000, 0, 1, 0, 1)
             end
         end
 
@@ -703,6 +722,7 @@ task.spawn(function()
             if #targets > 0 then
                 for _, targetChar in ipairs(targets) do
                     if not flingActive or not todosActive then break end
+                    breakEnemyFreeze(targetChar)
                     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
@@ -733,6 +753,7 @@ task.spawn(function()
             local targetPlayer = getTargetPlayer()
             if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
                 local targetChar = targetPlayer.Character
+                breakEnemyFreeze(targetChar)
                 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot then
