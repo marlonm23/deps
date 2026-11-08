@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin Fixo + Sistema Início/Fim (Com Botão Parar)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin Fixo + Sistema Início/Fim (Com Loop Automático Iniciar/Parar)
 --]]
 
 local Players = game:GetService("Players")
@@ -15,8 +15,9 @@ local antiFlingActive = false
 local invisibleActive = false
 local throwPartsActive = false
 
-local savedPos = nil -- Variável para armazenar a posição Início/Fim
-local autoTPActive = false -- Controle de ativação do modo fim
+local savedPos = nil -- Variável para armazenar a posição Início
+local endPos = nil   -- Variável para armazenar a posição Fim
+local loopActive = false -- Controle do loop automático (Ir e Voltar)
 
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
@@ -30,7 +31,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 335)
+mainFrame.Size = UDim2.new(0, 200, 0, 370)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -67,7 +68,7 @@ Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 5)
 
 -- Container da Aba 1 (Controles)
 local tab1Content = Instance.new("Frame")
-tab1Content.Size = UDim2.new(0, 184, 0, 280)
+tab1Content.Size = UDim2.new(0, 184, 0, 315)
 tab1Content.Position = UDim2.new(0, 8, 0, 42)
 tab1Content.BackgroundTransparency = 1
 tab1Content.Visible = true
@@ -75,7 +76,7 @@ tab1Content.Parent = mainFrame
 
 -- Container da Aba 2 (Início / Fim)
 local tab2Content = Instance.new("Frame")
-tab2Content.Size = UDim2.new(0, 184, 0, 280)
+tab2Content.Size = UDim2.new(0, 184, 0, 315)
 tab2Content.Position = UDim2.new(0, 8, 0, 42)
 tab2Content.BackgroundTransparency = 1
 tab2Content.Visible = false
@@ -177,43 +178,54 @@ throwPartsButton.Parent = tab1Content
 Instance.new("UICorner", throwPartsButton).CornerRadius = UDim.new(0, 6)
 
 
--- ELEMENTOS DA ABA 2 (Início / Fim / Parar)
+-- ELEMENTOS DA ABA 2 (Início / Fim / Iniciar / Parar)
 local inicioButton = Instance.new("TextButton")
-inicioButton.Size = UDim2.new(0, 168, 0, 35)
-inicioButton.Position = UDim2.new(0, 8, 0, 10)
+inicioButton.Size = UDim2.new(0, 168, 0, 32)
+inicioButton.Position = UDim2.new(0, 8, 0, 5)
 inicioButton.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
 inicioButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-inicioButton.TextSize = 13
+inicioButton.TextSize = 12
 inicioButton.Font = Enum.Font.SourceSansBold
 inicioButton.Text = "Início (Marcar Posição)"
 inicioButton.Parent = tab2Content
 Instance.new("UICorner", inicioButton).CornerRadius = UDim.new(0, 6)
 
 local fimButton = Instance.new("TextButton")
-fimButton.Size = UDim2.new(0, 168, 0, 35)
-fimButton.Position = UDim2.new(0, 8, 0, 52)
+fimButton.Size = UDim2.new(0, 168, 0, 32)
+fimButton.Position = UDim2.new(0, 8, 0, 42)
 fimButton.BackgroundColor3 = Color3.fromRGB(50, 180, 100)
 fimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-fimButton.TextSize = 13
+fimButton.TextSize = 12
 fimButton.Font = Enum.Font.SourceSansBold
 fimButton.Text = "Fim (Ir para Posição)"
 fimButton.Parent = tab2Content
 Instance.new("UICorner", fimButton).CornerRadius = UDim.new(0, 6)
 
+local iniciarButton = Instance.new("TextButton")
+iniciarButton.Size = UDim2.new(0, 168, 0, 32)
+iniciarButton.Position = UDim2.new(0, 8, 0, 79)
+iniciarButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
+iniciarButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+iniciarButton.TextSize = 12
+iniciarButton.Font = Enum.Font.SourceSansBold
+iniciarButton.Text = "Iniciar (Ir e Voltar: OFF)"
+iniciarButton.Parent = tab2Content
+Instance.new("UICorner", iniciarButton).CornerRadius = UDim.new(0, 6)
+
 local pararButton = Instance.new("TextButton")
-pararButton.Size = UDim2.new(0, 168, 0, 35)
-pararButton.Position = UDim2.new(0, 8, 0, 94)
+pararButton.Size = UDim2.new(0, 168, 0, 32)
+pararButton.Position = UDim2.new(0, 8, 0, 116)
 pararButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 pararButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-pararButton.TextSize = 13
+pararButton.TextSize = 12
 pararButton.Font = Enum.Font.SourceSansBold
-pararButton.Text = "Parar Teleporte"
+pararButton.Text = "Parar"
 pararButton.Parent = tab2Content
 Instance.new("UICorner", pararButton).CornerRadius = UDim.new(0, 6)
 
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0, 168, 0, 60)
-statusLabel.Position = UDim2.new(0, 8, 0, 135)
+statusLabel.Size = UDim2.new(0, 168, 0, 65)
+statusLabel.Position = UDim2.new(0, 8, 0, 155)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 statusLabel.TextSize = 11
@@ -223,7 +235,7 @@ statusLabel.Text = "Status: Nenhuma posição marcada."
 statusLabel.Parent = tab2Content
 
 
--- Lógica dos botões de Início, Fim e Parar
+-- Lógica dos botões de Início, Fim, Iniciar e Parar
 inicioButton.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -236,36 +248,57 @@ inicioButton.MouseButton1Click:Connect(function()
 end)
 
 fimButton.MouseButton1Click:Connect(function()
-    autoTPActive = true
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root and savedPos then
-        root.CFrame = savedPos
+    if root and endPos then
+        root.CFrame = endPos
         statusLabel.Text = "Status: Movido para o Fim!"
     else
-        statusLabel.Text = "Status: Nenhuma posição salva para o Fim!"
+        statusLabel.Text = "Status: Nenhuma posição de Fim salva ainda!"
     end
 end)
 
-pararButton.MouseButton1Click:Connect(function()
-    autoTPActive = false
-    statusLabel.Text = "Status: Teleporte interrompido pelo botão Parar."
+iniciarButton.MouseButton1Click:Connect(function()
+    loopActive = not loopActive
+    iniciarButton.Text = loopActive and "Iniciar (Ir e Voltar: ON)" or "Iniciar (Ir e Voltar: OFF)"
+    iniciarButton.BackgroundColor3 = loopActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(150, 50, 200)
+    statusLabel.Text = loopActive and "Status: Loop de ir e voltar ativado!" else "Status: Loop pausado."
 end)
 
--- Detecção de Teleporte do Jogo (salva a posição anterior se o jogo mover o jogador)
+pararButton.MouseButton1Click:Connect(function()
+    loopActive = false
+    iniciarButton.Text = "Iniciar (Ir e Voltar: OFF)"
+    iniciarButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
+    statusLabel.Text = "Status: Interrompido pelo botão Parar."
+end)
+
+-- Detecção de Teleporte do Jogo e Loop Automático de Ir e Voltar
 local lastPos = nil
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        if lastPos then
-            local dist = (root.Position - lastPos).Magnitude
-            if dist > 45 then
-                savedPos = CFrame.new(lastPos)
-                statusLabel.Text = "Status: Teleporte detectado! 'Fim' atualizado para a posição anterior."
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            if lastPos then
+                local dist = (root.Position - lastPos).Magnitude
+                -- Se o jogo teleportou/puxou o jogador para longe (> 45 studs)
+                if dist > 45 then
+                    endPos = CFrame.new(lastPos) -- Salva a posição antes do teleporte como 'Fim'
+                    statusLabel.Text = "Status: Teleporte detectado! 'Fim' atualizado."
+                end
+            end
+            lastPos = root.Position
+
+            -- Executa o ciclo automático se ativado
+            if loopActive and savedPos and endPos then
+                root.CFrame = endPos
+                task.wait(0.3)
+                if not loopActive then break end
+                root.CFrame = savedPos
+                task.wait(0.3)
             end
         end
-        lastPos = root.Position
     end
 end)
 
