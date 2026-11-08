@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Fling Especializado (Anti-Script Kill)
+    Script: Mass Walkfling + Artilharia Pesada de Blocos Pretos + Inimigos JSON + Anti-Fling + Avatar Matcher
 --]]
 
 local Players = game:GetService("Players")
@@ -246,7 +246,6 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para obter peças acessíveis do alvo (incluindo Tools e Acessórios)
 local function getTargetHitParts(character)
     local parts = {}
     if not character then return parts end
@@ -603,7 +602,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso dos Blocos Pretos (Focado em Tools e Acessórios)
+-- Loop de Artilharia Pesada: Blocos Pretos com Massa e Velocidade Extrema
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -653,11 +652,12 @@ task.spawn(function()
                                 local selectedHitPart = hitParts[math.random(1, #hitParts)]
                                 pcall(function()
                                     part.CanCollide = true
-                                    part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                                    -- Massa extrema para quebrar qualquer script ancorado ou de defesa
+                                    part.CustomPhysicalProperties = PhysicalProperties.new(1000, 0, 1, 0, 1)
                                     
                                     local direction = (selectedHitPart.Position - part.Position).Unit
-                                    part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 50, 0)
-                                    part.AssemblyAngularVelocity = Vector3.new(4000, 4000, 4000)
+                                    part.AssemblyLinearVelocity = direction * 1000 + Vector3.new(0, 200, 0)
+                                    part.AssemblyAngularVelocity = Vector3.new(10000, 10000, 10000)
                                 end)
                             end
                         end
@@ -665,11 +665,11 @@ task.spawn(function()
                 end
             end
         end
-        task.wait(0.1)
+        task.wait(0.05)
     end
 end)
 
--- Loop Fling Especializado em Script Kill (Alta Massa + Interseção Y)
+-- Loop Fling Padrão de Alta Massa
 task.spawn(function()
     while true do
         if not flingActive then
@@ -686,10 +686,9 @@ task.spawn(function()
             continue
         end
 
-        -- Aplica densidade física máxima ao nosso personagem durante o Fling
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 1, 0, 1)
+                part.CustomPhysicalProperties = PhysicalProperties.new(1000, 0, 1, 0, 1)
             end
         end
 
@@ -707,7 +706,7 @@ task.spawn(function()
                     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.2) do
+                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.15) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
                             if not character or not rootPart then break end
@@ -719,12 +718,9 @@ task.spawn(function()
                                 end
                             end)
 
-                            -- Interseção vertical levemente abaixo da hitbox do alvo (Up-Fling)
-                            rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.2, 0))
-                            
-                            -- Impulso vetorial direto apontado para o topo sem depender de rotação
-                            rootPart.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + (targetRoot.CFrame.LookVector * 10000)
-                            rootPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
+                            rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.5, 0))
+                            rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetRoot.CFrame.LookVector * 20000)
+                            rootPart.AssemblyAngularVelocity = Vector3.new(20000, 20000, 20000)
 
                             RunService.Heartbeat:Wait()
                         end
@@ -752,10 +748,9 @@ task.spawn(function()
                             end
                         end)
                         
-                        -- Up-Fling contínuo de alta massa
-                        rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.2, 0))
-                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + (targetRoot.CFrame.LookVector * 10000)
-                        rootPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
+                        rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.5, 0))
+                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 50000, 0) + (targetRoot.CFrame.LookVector * 20000)
+                        rootPart.AssemblyAngularVelocity = Vector3.new(20000, 20000, 20000)
                         
                         RunService.Heartbeat:Wait()
                     end
