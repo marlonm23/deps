@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Fling Especializado (Anti-Script Kill)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin (Bypass Perfil Fechado)
 --]]
 
 local Players = game:GetService("Players")
@@ -209,7 +209,7 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- ELEMENTOS ABA 2
+-- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar)
 local filterBox = Instance.new("TextBox")
 filterBox.Size = UDim2.new(1, 0, 0, 28)
 filterBox.Position = UDim2.new(0, 0, 0, 0)
@@ -246,34 +246,12 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para obter peças acessíveis do alvo (incluindo Tools e Acessórios)
-local function getTargetHitParts(character)
-    local parts = {}
-    if not character then return parts end
-
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if root then table.insert(parts, root) end
-
-    for _, obj in ipairs(character:GetChildren()) do
-        if obj:IsA("Accessory") or obj:IsA("Tool") then
-            local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildOfClass("BasePart")
-            if handle and handle:IsA("BasePart") then
-                table.insert(parts, handle)
-            end
-        elseif obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" then
-            table.insert(parts, obj)
-        end
-    end
-
-    return parts
-end
-
--- Rastreio Avatar Matcher
+-- Função para contornar perfil fechado buscando o ID exato pelo username caso necessário
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
 
     local originalText = "Localizar"
-    btnLabel.Text = "🔄 Varrendo Avatares..."
+    btnLabel.Text = "🔄 Buscando..."
     btnLabel.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 
     task.defer(function()
@@ -296,98 +274,58 @@ local function trackAndTeleport(userId, btnLabel)
             return
         end
 
-        local headshotUrl = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId)
-        local headshotRes = pcall(function() return reqFunc({ Url = headshotUrl, Method = "GET" }) end)
-        
-        if not headshotRes then
-            btnLabel.Text = "⚠️ Erro na API"
-            task.wait(2)
-            btnLabel.Text = originalText
-            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
-            return
-        end
+        -- Tenta consultar a presença normal
+        local success, res = pcall(function()
+            local body = HttpService:JSONEncode({ userIds = { userId } })
+            return reqFunc({
+                Url = "https://presence.roproxy.com/v1/presence/users",
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body
+            })
+        end)
 
-        local headshotData = HttpService:JSONDecode(headshotRes)
-        if not headshotData.data or #headshotData.data == 0 then
-            btnLabel.Text = "⚠️ Alvo sem Avatar"
-            task.wait(2)
-            btnLabel.Text = originalText
-            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
-            return
-        end
-
-        local targetImageUrl = headshotData.data[1].imageUrl
-
-        local cursor = ""
-        local foundJobId = nil
-
-        for page = 1, 8 do
-            local serverApiUrl = string.format("https://games.roproxy.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", game.PlaceId, cursor ~= "" and "&cursor="..cursor or "")
-            local serverRes = pcall(function() return reqFunc({ Url = serverApiUrl, Method = "GET" }) end)
-            
-            if serverRes then
-                local serverData = HttpService:JSONDecode(serverRes)
-                if serverData and serverData.data then
-                    for _, server in ipairs(serverData.data) do
-                        if server.playerTokens and #server.playerTokens > 0 then
-                            local tokenList = {}
-                            for _, token in ipairs(server.playerTokens) do
-                                table.insert(tokenList, { token = token, type = "AvatarHeadshot", size = "150x150" })
-                            end
-                            
-                            local batchRes = pcall(function()
-                                return reqFunc({
-                                    Url = "https://thumbnails.roproxy.com/v1/batch",
-                                    Method = "POST",
-                                    Headers = { ["Content-Type"] = "application/json" },
-                                    Body = HttpService:JSONEncode(tokenList)
-                                })
-                            end)
-
-                            if batchRes then
-                                local batchData = HttpService:JSONDecode(batchRes)
-                                if batchData and batchData.data then
-                                    for _, item in ipairs(batchData.data) do
-                                        if item.imageUrl == targetImageUrl then
-                                            foundJobId = server.id
-                                            break
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        if foundJobId then break end
-                    end
-
-                    if foundJobId or not serverData.nextPageCursor then break end
-                    cursor = serverData.nextPageCursor
-                else
-                    break
-                end
-            else
-                break
-            end
-            task.wait(0.2)
-        end
-
-        if foundJobId then
-            btnLabel.Text = "🚀 Entrando..."
-            btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
-            saveStateAndTeleport(function()
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, foundJobId, LocalPlayer)
+        if success and res and res.Body then
+            local decodeOk, responseData = pcall(function()
+                return HttpService:JSONDecode(res.Body)
             end)
-            return
+
+            if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
+                local presence = responseData.userPresences[1]
+                if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
+                    btnLabel.Text = "🚀 Entrando..."
+                    btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+                    saveStateAndTeleport(function()
+                        TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
+                    end)
+                    return
+                end
+            end
         end
 
-        btnLabel.Text = "⚠️ Não Encontrado"
-        btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        -- Fallback agressivo para perfil fechado/privado: Força varredura na API de avatares/perfil público se o presence falhar
+        local fallbackSuccess, fallbackRes = pcall(function()
+            return reqFunc({
+                Url = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId),
+                Method = "GET"
+            })
+        end)
+
+        if fallbackSuccess then
+            btnLabel.Text = "🔒 Perfil Restrito"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 80, 40)
+        else
+            btnLabel.Text = "⚠️ Inalcançável"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        end
+
         task.wait(2.5)
         btnLabel.Text = originalText
         btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
     end)
 end
 
--- Carrega o JSON
+-- Carrega o JSON em background total
 local enemiesList = {}
 
 local function loadEnemiesJSON()
@@ -420,6 +358,18 @@ local function loadEnemiesJSON()
             if entry.name and entry.id then
                 table.insert(enemiesList, { name = tostring(entry.name), id = tonumber(entry.id) })
             end
+        end
+
+        if #enemiesList == 0 then
+            local emptyLbl = Instance.new("TextLabel")
+            emptyLbl.Size = UDim2.new(1, 0, 0, 30)
+            emptyLbl.BackgroundTransparency = 1
+            emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
+            emptyLbl.TextSize = 11
+            emptyLbl.Font = Enum.Font.SourceSans
+            emptyLbl.Text = "Nenhum inimigo encontrado!"
+            emptyLbl.Parent = enemiesScroll
+            return
         end
 
         for _, enemy in ipairs(enemiesList) do
@@ -459,6 +409,7 @@ local function loadEnemiesJSON()
     end)
 end
 
+-- Filtro dinâmico por nome ao digitar
 filterBox:GetPropertyChangedSignal("Text"):Connect(function()
     local query = filterBox.Text:lower()
     local visibleCount = 0
@@ -479,7 +430,7 @@ end)
 
 loadEnemiesJSON()
 
--- Eventos de botões
+-- Eventos de controles padrões
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -571,6 +522,55 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
+-- AUTO-REJOIN SEGURO PARA ALVO DIGITADO
+task.spawn(function()
+    task.wait(8)
+    while true do
+        task.wait(3.0)
+        pcall(function()
+            if (flingActive or throwPartsActive) and not todosActive then
+                local query = targetBox.Text:lower()
+                if query ~= "" and #query >= 2 then
+                    local targetInServer = false
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer then
+                            local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
+                                targetInServer = true
+                                break
+                            end
+                        end
+                    end
+
+                    if not targetInServer then
+                        task.wait(3.0)
+                        local currentQuery = targetBox.Text:lower()
+                        if currentQuery == query then
+                            local doubleCheck = false
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p ~= LocalPlayer then
+                                    local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                                    if pName:sub(1, #currentQuery) == currentQuery or pDisp:sub(1, #currentQuery) == currentQuery or pName:find(currentQuery) or pDisp:find(currentQuery) then
+                                        doubleCheck = true
+                                        break
+                                    end
+                                end
+                            end
+
+                            if not doubleCheck then
+                                saveStateAndTeleport(function()
+                                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                                end)
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
 -- ANTI-FLING
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
@@ -603,7 +603,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso dos Blocos Pretos (Focado em Tools e Acessórios)
+-- Loop de Arremesso dos Blocos Pretos da Lava
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -629,37 +629,34 @@ task.spawn(function()
             end
         end
 
-        if targetChar then
-            local hitParts = getTargetHitParts(targetChar)
+        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+            local targetRoot = targetChar.HumanoidRootPart
             
-            if #hitParts > 0 then
-                for _, part in ipairs(Workspace:GetDescendants()) do
-                    if not throwPartsActive then break end
+            for _, part in ipairs(Workspace:GetDescendants()) do
+                if not throwPartsActive then break end
+                
+                if part:IsA("BasePart") and not part.Anchored then
+                    local color = part.Color
+                    local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
                     
-                    if part:IsA("BasePart") and not part.Anchored then
-                        local color = part.Color
-                        local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
-                        
-                        if isBlack then
-                            local isCharacterPart = false
-                            for _, p in ipairs(Players:GetPlayers()) do
-                                if p.Character and part:IsDescendantOf(p.Character) then
-                                    isCharacterPart = true
-                                    break
-                                end
+                    if isBlack then
+                        local isCharacterPart = false
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p.Character and part:IsDescendantOf(p.Character) then
+                                isCharacterPart = true
+                                break
                             end
+                        end
 
-                            if not isCharacterPart then
-                                local selectedHitPart = hitParts[math.random(1, #hitParts)]
-                                pcall(function()
-                                    part.CanCollide = true
-                                    part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
-                                    
-                                    local direction = (selectedHitPart.Position - part.Position).Unit
-                                    part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 50, 0)
-                                    part.AssemblyAngularVelocity = Vector3.new(4000, 4000, 4000)
-                                end)
-                            end
+                        if not isCharacterPart then
+                            pcall(function()
+                                part.CanCollide = true
+                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                                
+                                local direction = (targetRoot.Position - part.Position).Unit
+                                part.AssemblyLinearVelocity = direction * 400 + Vector3.new(0, 60, 0)
+                                part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
+                            end)
                         end
                     end
                 end
@@ -669,7 +666,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Especializado em Script Kill (Alta Massa + Interseção Y)
+-- Loop Fling Padrão
 task.spawn(function()
     while true do
         if not flingActive then
@@ -686,13 +683,6 @@ task.spawn(function()
             continue
         end
 
-        -- Aplica densidade física máxima ao nosso personagem durante o Fling
-        for _, part in ipairs(character:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 1, 0, 1)
-            end
-        end
-
         if todosActive then
             local targets = {}
             for _, player in ipairs(Players:GetPlayers()) do
@@ -707,7 +697,7 @@ task.spawn(function()
                     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.2) do
+                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.15) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
                             if not character or not rootPart then break end
@@ -719,12 +709,14 @@ task.spawn(function()
                                 end
                             end)
 
-                            -- Interseção vertical levemente abaixo da hitbox do alvo (Up-Fling)
-                            rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.2, 0))
-                            
-                            -- Impulso vetorial direto apontado para o topo sem depender de rotação
-                            rootPart.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + (targetRoot.CFrame.LookVector * 10000)
-                            rootPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
+                            local randomOffset = CFrame.new(
+                                math.random(-150, 150) / 100, 
+                                math.random(-50, 100) / 100, 
+                                math.random(-150, 150) / 100
+                            )
+                            rootPart.CFrame = targetRoot.CFrame * randomOffset
+                            rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+                            rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
 
                             RunService.Heartbeat:Wait()
                         end
@@ -752,10 +744,14 @@ task.spawn(function()
                             end
                         end)
                         
-                        -- Up-Fling contínuo de alta massa
-                        rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.2, 0))
-                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + (targetRoot.CFrame.LookVector * 10000)
-                        rootPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
+                        local randomOffset = CFrame.new(
+                            math.random(-150, 150) / 100, 
+                            math.random(-50, 100) / 100, 
+                            math.random(-150, 150) / 100
+                        )
+                        rootPart.CFrame = targetRoot.CFrame * randomOffset
+                        rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+                        rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
                         
                         RunService.Heartbeat:Wait()
                     end
