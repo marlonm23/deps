@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Balloon por Aviso de Admin
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin Inimigo JSON
 --]]
 
 local Players = game:GetService("Players")
@@ -209,37 +209,6 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- DETECTOR DE AVISO DE ADMIN NA TELA (Procura por caixas de texto com o comando "balloon")
-task.spawn(function()
-    while true do
-        task.wait(0.2)
-        local char = LocalPlayer.Character
-        if char then
-            local adminNotifiedBalloon = false
-
-            -- Varre todas as UIs da tela (PlayerGui) procurando por avisos de comando de admin
-            for _, gui in ipairs(PlayerGui:GetDescendants()) do
-                if (gui:IsA("TextLabel") or gui:IsA("TextBox")) and gui.Visible then
-                    local text = gui.Text:lower()
-                    -- Se a telinha/aviso na tela contiver o comando de balão, dispara
-                    if text:find("balloon") or text:find(":balloon") then
-                        adminNotifiedBalloon = true
-                        break
-                    end
-                end
-            end
-
-            -- Se o aviso do admin apareceu na tela, reseta na hora para anular o bug
-            if adminNotifiedBalloon then
-                pcall(function()
-                    char:BreakJoints()
-                end)
-                task.wait(1.5)
-            end
-        end
-    end
-end)
-
 -- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar)
 local filterBox = Instance.new("TextBox")
 filterBox.Size = UDim2.new(1, 0, 0, 28)
@@ -341,7 +310,7 @@ local function trackAndTeleport(userId, btnLabel)
     end)
 end
 
--- Carrega o JSON em background total
+-- Carrega o JSON em background total e armazena globalmente para o Auto-Rejoin
 local enemiesList = {}
 
 local function loadEnemiesJSON()
@@ -517,53 +486,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- DETECTOR DE EFEITO VERDE / CAJADO DE VINHAS
-task.spawn(function()
-    while true do
-        task.wait(0.15)
-        local char = LocalPlayer.Character
-        if char then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            if root and humanoid and humanoid.Health > 0 then
-                local pegoPelasVinhas = false
-
-                for _, obj in ipairs(char:GetChildren()) do
-                    if obj:IsA("Highlight") or obj:IsA("SelectionBox") then
-                        local c = obj.FillColor or obj.OutlineColor or obj.Color3
-                        if c and (c.G > 0.6 and c.R < 0.4) then
-                            pegoPelasVinhas = true
-                            break
-                        end
-                    elseif obj:IsA("Model") or obj:IsA("Folder") then
-                        local n = obj.Name:lower()
-                        if n:find("vinha") or n:find("vine") or n:find("root") or n:find("raiz") or n:find("trap") then
-                            pegoPelasVinhas = true
-                            break
-                        end
-                    end
-                end
-
-                if not pegoPelasVinhas and humanoid.WalkSpeed == 0 then
-                    for _, child in ipairs(Workspace:GetDescendants()) do
-                        if child:IsA("BasePart") and not child:IsDescendantOf(char) and not child:IsDescendantOf(Workspace.Terrain) then
-                            local n = child.Name:lower()
-                            if (n:find("vinha") or n:find("vine") or n:find("root") or n:find("raiz")) and (child.Position - root.Position).Magnitude < 6 then
-                                pegoPelasVinhas = true
-                                break
-                            end
-                        end
-                    end
-                end
-
-                if pegoPelasVinhas then
-                    humanoid.Health = 0
-                end
-            end
-        end
-    end
-end)
-
 local function getTargetPlayer()
     local query = targetBox.Text:lower()
     if query == "" then return nil end
@@ -584,6 +506,56 @@ local function isValidTarget(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     return targetRoot and humanoid and humanoid.Health > 0
 end
+
+-- AUTO-REJOIN INTELIGENTE BASEADO NOS INIMIGOS DO JSON
+task.spawn(function()
+    task.wait(10) -- Aguarda o carregamento inicial da sessão
+    while true do
+        task.wait(3.0)
+        -- Só monitora se o Fling ou Jogar Blocos estiver ativo e a lista JSON já tiver sido baixada
+        if (flingActive or throwPartsActive) and #enemiesList > 0 then
+            local reqFunc = (syn and syn.request) or (http and http.request) or request or http_request
+            if reqFunc then
+                for _, enemy in ipairs(enemiesList) do
+                    -- Verifica se o inimigo do JSON está no servidor atual
+                    local inServer = Players:GetPlayerByUserId(enemy.id)
+                    if not inServer then
+                        -- Se não está no servidor atual, consulta a presença dele na API da Roblox em background
+                        local success, res = pcall(function()
+                            local body = HttpService:JSONEncode({ userIds = { enemy.id } })
+                            return reqFunc({
+                                Url = "https://presence.roproxy.com/v1/presence/users",
+                                Method = "POST",
+                                Headers = { ["Content-Type"] = "application/json" },
+                                Body = body
+                            })
+                        end)
+
+                        if success and res and res.Body then
+                            local decodeOk, responseData = pcall(function()
+                                return HttpService:JSONDecode(res.Body)
+                            end)
+
+                            if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
+                                local presence = responseData.userPresences[1]
+                                -- Se ele entrou em um jogo/servidor válido (Tipo 2 = Em jogo)
+                                if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
+                                    -- Se o gameId dele for diferente do nosso servidor atual, vai atrás dele!
+                                    if presence.gameId ~= game.JobId then
+                                        saveStateAndTeleport(function()
+                                            TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
+                                        end)
+                                        return
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
 
 -- ANTI-FLING
 RunService.Heartbeat:Connect(function()
@@ -719,7 +691,7 @@ task.spawn(function()
                             pcall(function()
                                 targetRoot.CanCollide = true
                                 for _, part in ipairs(targetChar:GetChildren()) do
-                                    if part:IsA("BasePart") then part.CanCollide = true end
+                                    if part:IsA("BasePart")  then part.CanCollide = true end
                                 end
                             end)
 
