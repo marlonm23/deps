@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Artilharia em Área (AoE Blast) + Inimigos JSON + Anti-Fling + Anti-Desync
+    Script: Mass Walkfling + Prensa Hidráulica Vertical + Inimigos JSON + Anti-Fling + Avatar Matcher
 --]]
 
 local Players = game:GetService("Players")
@@ -245,25 +245,6 @@ statusCsvLabel.TextSize = 11
 statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
-
--- Função para quebrar congelamentos estáticos
-local function breakEnemyFreeze(targetChar)
-    if not targetChar then return end
-    pcall(function()
-        for _, part in ipairs(targetChar:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Anchored = false
-                part.CanCollide = true
-                part.CustomPhysicalProperties = PhysicalProperties.new(50000, 0, 1, 0, 1)
-            end
-        end
-        local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.PlatformStand = false
-            humanoid.Sit = false
-        end
-    end)
-end
 
 -- Rastreio Avatar Matcher
 local function trackAndTeleport(userId, btnLabel)
@@ -599,7 +580,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Artilharia em Área (AoE Blast & Convergence)
+-- Loop de Pressão Vertical (Bypass Anti-Fling Infinite Yield por Compressão de Blocos)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -626,20 +607,18 @@ task.spawn(function()
         end
 
         if targetChar then
-            breakEnemyFreeze(targetChar)
-            
-            -- Pega qualquer peça de referência (Root, Torso ou Head) para contornar desincronizações
-            local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("Head")
+            local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso")
             
             if targetPart then
-                local centerPos = targetPart.Position
+                local targetPos = targetPart.Position
                 
+                -- Pega blocos do cenário e cria uma força de prensa esmagando de cima para baixo
                 for _, part in ipairs(Workspace:GetDescendants()) do
                     if not throwPartsActive then break end
                     
                     if part:IsA("BasePart") and not part.Anchored then
-                        local dist = (part.Position - centerPos).Magnitude
-                        if dist < 150 then
+                        local dist = (part.Position - targetPos).Magnitude
+                        if dist < 100 then
                             local isCharacterPart = false
                             for _, p in ipairs(Players:GetPlayers()) do
                                 if p.Character and part:IsDescendantOf(p.Character) then
@@ -651,11 +630,12 @@ task.spawn(function()
                             if not isCharacterPart then
                                 pcall(function()
                                     part.CanCollide = true
-                                    part.CustomPhysicalProperties = PhysicalProperties.new(50000, 0, 1, 0, 1)
+                                    -- Densidade absurda para o bloco agir como uma prensa hidráulica pesada
+                                    part.CustomPhysicalProperties = PhysicalProperties.new(100000, 0, 1, 0, 1)
                                     
-                                    local pullDirection = (centerPos - part.Position).Unit
-                                    part.AssemblyLinearVelocity = pullDirection * 1500 + Vector3.new(0, 300, 0)
-                                    part.AssemblyAngularVelocity = Vector3.new(25000, 25000, 25000)
+                                    -- Força direcionada estritamente para baixo (esmagando contra o chão)
+                                    part.AssemblyLinearVelocity = Vector3.new(0, -500, 0)
+                                    part.AssemblyAngularVelocity = Vector3.new(0, 0, 0) -- Sem rotação para não disparar o Anti-Fling do IY
                                 end)
                             end
                         end
@@ -663,7 +643,7 @@ task.spawn(function()
                 end
             end
         end
-        task.wait(0.05)
+        task.wait(0.03)
     end
 end)
 
@@ -701,7 +681,6 @@ task.spawn(function()
             if #targets > 0 then
                 for _, targetChar in ipairs(targets) do
                     if not flingActive or not todosActive then break end
-                    breakEnemyFreeze(targetChar)
                     local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
                     if targetPart and isValidTarget(targetChar) then
                         local startTick = tick()
@@ -729,7 +708,6 @@ task.spawn(function()
             local targetPlayer = getTargetPlayer()
             if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
                 local targetChar = targetPlayer.Character
-                breakEnemyFreeze(targetChar)
                 local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
                 
                 if targetPart then
