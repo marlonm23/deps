@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Target em Tools/Acessórios
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Fling Especializado (Anti-Script Kill)
 --]]
 
 local Players = game:GetService("Players")
@@ -669,7 +669,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Padrão
+-- Loop Fling Especializado em Script Kill (Alta Massa + Interseção Y)
 task.spawn(function()
     while true do
         if not flingActive then
@@ -686,6 +686,13 @@ task.spawn(function()
             continue
         end
 
+        -- Aplica densidade física máxima ao nosso personagem durante o Fling
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 1, 0, 1)
+            end
+        end
+
         if todosActive then
             local targets = {}
             for _, player in ipairs(Players:GetPlayers()) do
@@ -700,7 +707,7 @@ task.spawn(function()
                     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.15) do
+                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.2) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
                             if not character or not rootPart then break end
@@ -712,14 +719,12 @@ task.spawn(function()
                                 end
                             end)
 
-                            local randomOffset = CFrame.new(
-                                math.random(-150, 150) / 100, 
-                                math.random(-50, 100) / 100, 
-                                math.random(-150, 150) / 100
-                            )
-                            rootPart.CFrame = targetRoot.CFrame * randomOffset
-                            rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
-                            rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                            -- Interseção vertical levemente abaixo da hitbox do alvo (Up-Fling)
+                            rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.2, 0))
+                            
+                            -- Impulso vetorial direto apontado para o topo sem depender de rotação
+                            rootPart.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + (targetRoot.CFrame.LookVector * 10000)
+                            rootPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
 
                             RunService.Heartbeat:Wait()
                         end
@@ -747,14 +752,10 @@ task.spawn(function()
                             end
                         end)
                         
-                        local randomOffset = CFrame.new(
-                            math.random(-150, 150) / 100, 
-                            math.random(-50, 100) / 100, 
-                            math.random(-150, 150) / 100
-                        )
-                        rootPart.CFrame = targetRoot.CFrame * randomOffset
-                        rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
-                        rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                        -- Up-Fling contínuo de alta massa
+                        rootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, -2.2, 0))
+                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + (targetRoot.CFrame.LookVector * 10000)
+                        rootPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
                         
                         RunService.Heartbeat:Wait()
                     end
