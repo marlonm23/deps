@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin Inimigo JSON
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin por Alvo (Corrigido)
 --]]
 
 local Players = game:GetService("Players")
@@ -310,7 +310,7 @@ local function trackAndTeleport(userId, btnLabel)
     end)
 end
 
--- Carrega o JSON em background total e armazena globalmente para o Auto-Rejoin
+-- Carrega o JSON em background total
 local enemiesList = {}
 
 local function loadEnemiesJSON()
@@ -507,48 +507,47 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- AUTO-REJOIN INTELIGENTE BASEADO NOS INIMIGOS DO JSON
+-- AUTO-REJOIN LEVE BASEADO NO NOME DA CAIXINHA DA ABA 1
 task.spawn(function()
-    task.wait(10) -- Aguarda o carregamento inicial da sessão
+    task.wait(8) -- Aguarda o jogo estabilizar ao entrar
     while true do
-        task.wait(3.0)
-        -- Só monitora se o Fling ou Jogar Blocos estiver ativo e a lista JSON já tiver sido baixada
-        if (flingActive or throwPartsActive) and #enemiesList > 0 then
-            local reqFunc = (syn and syn.request) or (http and http.request) or request or http_request
-            if reqFunc then
-                for _, enemy in ipairs(enemiesList) do
-                    -- Verifica se o inimigo do JSON está no servidor atual
-                    local inServer = Players:GetPlayerByUserId(enemy.id)
-                    if not inServer then
-                        -- Se não está no servidor atual, consulta a presença dele na API da Roblox em background
-                        local success, res = pcall(function()
-                            local body = HttpService:JSONEncode({ userIds = { enemy.id } })
-                            return reqFunc({
-                                Url = "https://presence.roproxy.com/v1/presence/users",
-                                Method = "POST",
-                                Headers = { ["Content-Type"] = "application/json" },
-                                Body = body
-                            })
-                        end)
+        task.wait(2.0)
+        -- Só monitora se o Fling ou Jogar Blocos estiver ativo e houver texto na caixa de alvo
+        if (flingActive or throwPartsActive) and not todosActive then
+            local query = targetBox.Text:lower()
+            if query ~= "" and #query >= 2 then
+                local targetInServer = false
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer then
+                        local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                        if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
+                            targetInServer = true
+                            break
+                        end
+                    end
+                end
 
-                        if success and res and res.Body then
-                            local decodeOk, responseData = pcall(function()
-                                return HttpService:JSONDecode(res.Body)
-                            end)
-
-                            if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
-                                local presence = responseData.userPresences[1]
-                                -- Se ele entrou em um jogo/servidor válido (Tipo 2 = Em jogo)
-                                if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
-                                    -- Se o gameId dele for diferente do nosso servidor atual, vai atrás dele!
-                                    if presence.gameId ~= game.JobId then
-                                        saveStateAndTeleport(function()
-                                            TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
-                                        end)
-                                        return
-                                    end
+                -- Se o alvo digitado não está no servidor, aguarda 3s de segurança e dá rejoin
+                if not targetInServer then
+                    task.wait(3.0)
+                    local doubleCheck = false
+                    local currentQuery = targetBox.Text:lower()
+                    if currentQuery == query then
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p ~= LocalPlayer then
+                                local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                                if pName:sub(1, #currentQuery) == currentQuery or pDisp:sub(1, #currentQuery) == currentQuery or pName:find(currentQuery) or pDisp:find(currentQuery) then
+                                    doubleCheck = true
+                                    break
                                 end
                             end
+                        end
+
+                        if not doubleCheck then
+                            saveStateAndTeleport(function()
+                                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                            end)
+                            break
                         end
                     end
                 end
@@ -691,7 +690,7 @@ task.spawn(function()
                             pcall(function()
                                 targetRoot.CanCollide = true
                                 for _, part in ipairs(targetChar:GetChildren()) do
-                                    if part:IsA("BasePart")  then part.CanCollide = true end
+                                    if part:IsA("BasePart") then part.CanCollide = true end
                                 end
                             end)
 
