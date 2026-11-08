@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos + Seletor de Abas (Controles e Cores)
+    Script: Mass Walkfling + Jogar Blocos (Really Black) + Rejoin Mesmo Servidor
 --]]
 
 local Players = game:GetService("Players")
@@ -247,16 +247,17 @@ throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 end)
 
+-- Rejoin corrigido para o MESMO servidor (JobId)
 rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
     if queueteleport then
         pcall(function()
-            queueteleport("task.spawn(function() if not game:IsLoaded() then game.Loaded:Wait() end TeleportService:Teleport(" .. game.PlaceId .. ") end)")
+            queueteleport("task.spawn(function() if not game:IsLoaded() then game.Loaded:Wait() end TeleportService:TeleportToPlaceInstance(" .. game.PlaceId .. ", '" .. game.JobId .. "', game:GetService('Players').LocalPlayer) end)")
         end)
     end
     pcall(function()
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end)
 end)
 
@@ -281,7 +282,7 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- Lógica do Botão Limpar Cores
+-- Botão Limpar Cores
 clearColorsButton.MouseButton1Click:Connect(function()
     for _, child in ipairs(colorsScroll:GetChildren()) do
         if child:IsA("TextLabel") then
@@ -299,7 +300,6 @@ task.spawn(function()
             pcall(function()
                 for _, part in ipairs(Workspace:GetDescendants()) do
                     if part:IsA("BasePart") and not part.Anchored then
-                        -- Ignorar partes de jogadores
                         local isChar = false
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p.Character and part:IsDescendantOf(p.Character) then
@@ -352,7 +352,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso
+-- Loop de Arremesso (Filtrando apenas blocos "Really Black" / R:0 G:0 B:0)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -394,14 +394,21 @@ task.spawn(function()
                     end
 
                     if not isCharacterPart then
-                        pcall(function()
-                            part.CanCollide = true
-                            part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
-                            
-                            local direction = (targetRoot.Position - part.Position).Unit
-                            part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
-                            part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
-                        end)
+                        -- Filtro para a cor Really Black (R:0, G:0, B:0 ou BrickColor "Really black")
+                        local bColor = part.BrickColor
+                        local c3 = part.Color
+                        local isReallyBlack = (bColor == BrickColor.new("Really black")) or (math.round(c3.R * 255) == 0 and math.round(c3.G * 255) == 0 and math.round(c3.B * 255) == 0)
+
+                        if isReallyBlack then
+                            pcall(function()
+                                part.CanCollide = true
+                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                                
+                                local direction = (targetRoot.Position - part.Position).Unit
+                                part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
+                                part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
+                            end)
+                        end
                     end
                 end
             end
