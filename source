@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin/Auto-Load + Server Hop por Nome
+    Script: Mass Walkfling + Jogar Blocos Pretos + Rejoin/Teleport com Persistência + Aba de Busca de Jogador
 --]]
 
 local Players = game:GetService("Players")
@@ -10,23 +10,57 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local flingActive = false
-local todosActive = false
-local antiFlingActive = false
-local invisibleActive = false
-local throwPartsActive = false
-local serverHopSearching = false
+-- Recupera os dados salvos se veio de um teleporte recente
+local savedConfig = _G.MassFlingConfig or {
+    flingActive = false,
+    todosActive = false,
+    antiFlingActive = false,
+    invisibleActive = false,
+    throwPartsActive = false,
+    targetText = "",
+    searchTargetText = "",
+    serverHopSearching = false
+}
 
-local preTeleportPos = nil -- Armazena a posição antes de ser teleportado pelo jogo
+local flingActive = savedConfig.flingActive
+local todosActive = savedConfig.todosActive
+local antiFlingActive = savedConfig.antiFlingActive
+local invisibleActive = savedConfig.invisibleActive
+local throwPartsActive = savedConfig.throwPartsActive
+local serverHopSearching = savedConfig.serverHopSearching
 
+local preTeleportPos = nil
 local scriptUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source"
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
--- Auto-executável / Re-injetar após teleporte ou rejoin
-if queueteleport then
-    pcall(function()
-        queueteleport('loadstring(game:HttpGet("' .. scriptUrl .. '"))()')
-    end)
+-- Função centralizada para salvar o estado antes de qualquer teleporte
+local function saveStateAndTeleport(teleportFunction)
+    if queueteleport then
+        local targetVal = targetBox and targetBox.Text or savedConfig.targetText
+        local searchVal = searchTargetBox and searchTargetBox.Text or savedConfig.searchTargetText
+        
+        local codeToQueue = string.format([[
+            _G.MassFlingConfig = {
+                flingActive = %s,
+                todosActive = %s,
+                antiFlingActive = %s,
+                invisibleActive = %s,
+                throwPartsActive = %s,
+                targetText = %q,
+                searchTargetText = %q,
+                serverHopSearching = %s
+            }
+            loadstring(game:HttpGet(%q))()
+        ]], 
+        tostring(flingActive), tostring(todosActive), tostring(antiFlingActive), 
+        tostring(invisibleActive), tostring(throwPartsActive), targetVal, 
+        searchVal, tostring(serverHopSearching), scriptUrl)
+
+        pcall(function()
+            queueteleport(codeToQueue)
+        end)
+    end
+    teleportFunction()
 end
 
 if PlayerGui:FindFirstChild("MassFlingUI") then
@@ -39,7 +73,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 355)
+mainFrame.Size = UDim2.new(0, 180, 0, 340)
 mainFrame.Position = UDim2.new(0, 50, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -51,131 +85,180 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
+-- Botões de Abas (Topo)
+local tab1Btn = Instance.new("TextButton")
+tab1Btn.Size = UDim2.new(0, 78, 0, 24)
+tab1Btn.Position = UDim2.new(0, 8, 0, 8)
+tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tab1Btn.TextSize = 11
+tab1Btn.Font = Enum.Font.SourceSansBold
+tab1Btn.Text = "Controles"
+tab1Btn.Parent = mainFrame
+Instance.new("UICorner", tab1Btn).CornerRadius = UDim.new(0, 5)
+
+local tab2Btn = Instance.new("TextButton")
+tab2Btn.Size = UDim2.new(0, 78, 0, 24)
+tab2Btn.Position = UDim2.new(0, 94, 0, 8)
+tab2Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+tab2Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tab2Btn.TextSize = 11
+tab2Btn.Font = Enum.Font.SourceSansBold
+tab2Btn.Text = "Procurar"
+tab2Btn.Parent = mainFrame
+Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 5)
+
+-- Container Aba 1 (Controles)
+local tab1Content = Instance.new("Frame")
+tab1Content.Size = UDim2.new(0, 164, 0, 290)
+tab1Content.Position = UDim2.new(0, 8, 0, 38)
+tab1Content.BackgroundTransparency = 1
+tab1Content.Visible = true
+tab1Content.Parent = mainFrame
+
+-- Container Aba 2 (Procurar)
+local tab2Content = Instance.new("Frame")
+tab2Content.Size = UDim2.new(0, 164, 0, 290)
+tab2Content.Position = UDim2.new(0, 8, 0, 38)
+tab2Content.BackgroundTransparency = 1
+tab2Content.Visible = false
+tab2Content.Parent = mainFrame
+
+-- Alternar Abas
+tab1Btn.MouseButton1Click:Connect(function()
+    tab1Content.Visible = true
+    tab2Content.Visible = false
+    tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    tab2Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+end)
+
+tab2Btn.MouseButton1Click:Connect(function()
+    tab1Content.Visible = false
+    tab2Content.Visible = true
+    tab2Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    tab1Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+end)
+
+-- ELEMENTOS ABA 1 (Controles)
 local flingButton = Instance.new("TextButton")
 flingButton.Size = UDim2.new(0, 160, 0, 26)
-flingButton.Position = UDim2.new(0, 10, 0, 10)
-flingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+flingButton.Position = UDim2.new(0, 2, 0, 5)
+flingButton.BackgroundColor3 = flingActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 flingButton.TextSize = 12
 flingButton.Font = Enum.Font.SourceSansBold
-flingButton.Text = "Fling: DESATIVADO"
-flingButton.Parent = mainFrame
+flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
+flingButton.Parent = tab1Content
 Instance.new("UICorner", flingButton).CornerRadius = UDim.new(0, 6)
 
 local todosButton = Instance.new("TextButton")
 todosButton.Size = UDim2.new(0, 160, 0, 26)
-todosButton.Position = UDim2.new(0, 10, 0, 41)
-todosButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+todosButton.Position = UDim2.new(0, 2, 0, 36)
+todosButton.BackgroundColor3 = todosActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 todosButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 todosButton.TextSize = 12
 todosButton.Font = Enum.Font.SourceSansBold
-todosButton.Text = "Todos: DESATIVADO"
-todosButton.Parent = mainFrame
+todosButton.Text = todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO"
+todosButton.Parent = tab1Content
 Instance.new("UICorner", todosButton).CornerRadius = UDim.new(0, 6)
 
 local antiFlingButton = Instance.new("TextButton")
 antiFlingButton.Size = UDim2.new(0, 160, 0, 26)
-antiFlingButton.Position = UDim2.new(0, 10, 0, 72)
-antiFlingButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+antiFlingButton.Position = UDim2.new(0, 2, 0, 67)
+antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 antiFlingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 antiFlingButton.TextSize = 12
 antiFlingButton.Font = Enum.Font.SourceSansBold
-antiFlingButton.Text = "Anti-Fling: OFF"
-antiFlingButton.Parent = mainFrame
+antiFlingButton.Text = antiFlingActive and "Anti-Fling: ON" or "Anti-Fling: OFF"
+antiFlingButton.Parent = tab1Content
 Instance.new("UICorner", antiFlingButton).CornerRadius = UDim.new(0, 6)
 
 local invisibleButton = Instance.new("TextButton")
 invisibleButton.Size = UDim2.new(0, 160, 0, 26)
-invisibleButton.Position = UDim2.new(0, 10, 0, 103)
-invisibleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+invisibleButton.Position = UDim2.new(0, 2, 0, 98)
+invisibleButton.BackgroundColor3 = invisibleActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 invisibleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 invisibleButton.TextSize = 12
 invisibleButton.Font = Enum.Font.SourceSansBold
-invisibleButton.Text = "Invisível: OFF"
-invisibleButton.Parent = mainFrame
+invisibleButton.Text = invisibleActive and "Invisível: ON" or "Invisível: OFF"
+invisibleButton.Parent = tab1Content
 Instance.new("UICorner", invisibleButton).CornerRadius = UDim.new(0, 6)
 
 local rejoinButton = Instance.new("TextButton")
 rejoinButton.Size = UDim2.new(0, 160, 0, 26)
-rejoinButton.Position = UDim2.new(0, 10, 0, 134)
+rejoinButton.Position = UDim2.new(0, 2, 0, 129)
 rejoinButton.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
 rejoinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 rejoinButton.TextSize = 12
 rejoinButton.Font = Enum.Font.SourceSansBold
 rejoinButton.Text = "Rejoin"
-rejoinButton.Parent = mainFrame
+rejoinButton.Parent = tab1Content
 Instance.new("UICorner", rejoinButton).CornerRadius = UDim.new(0, 6)
 
 local targetBox = Instance.new("TextBox")
 targetBox.Size = UDim2.new(0, 160, 0, 26)
-targetBox.Position = UDim2.new(0, 10, 0, 165)
+targetBox.Position = UDim2.new(0, 2, 0, 160)
 targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
-targetBox.PlaceholderText = "Nome p/ achar em servs..."
-targetBox.Text = ""
+targetBox.PlaceholderText = "Digite parte do nome..."
+targetBox.Text = savedConfig.targetText or ""
 targetBox.TextSize = 12
 targetBox.Font = Enum.Font.SourceSans
-targetBox.Parent = mainFrame
+targetBox.Visible = not todosActive
+targetBox.Parent = tab1Content
 Instance.new("UICorner", targetBox).CornerRadius = UDim.new(0, 6)
-
-local hopStatusButton = Instance.new("TextButton")
-hopStatusButton.Size = UDim2.new(0, 160, 0, 26)
-hopStatusButton.Position = UDim2.new(0, 10, 0, 196)
-hopStatusButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-hopStatusButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-hopStatusButton.TextSize = 11
-hopStatusButton.Font = Enum.Font.SourceSansBold
-hopStatusButton.Text = "Procurar em Servidores: OFF"
-hopStatusButton.Parent = mainFrame
-Instance.new("UICorner", hopStatusButton).CornerRadius = UDim.new(0, 6)
 
 local throwPartsButton = Instance.new("TextButton")
 throwPartsButton.Size = UDim2.new(0, 160, 0, 26)
-throwPartsButton.Position = UDim2.new(0, 10, 0, 227)
-throwPartsButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+throwPartsButton.Position = UDim2.new(0, 2, 0, 191)
+throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
 throwPartsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 throwPartsButton.TextSize = 12
 throwPartsButton.Font = Enum.Font.SourceSansBold
-throwPartsButton.Text = "Jogar Blocos: OFF"
-throwPartsButton.Parent = mainFrame
+throwPartsButton.Text = throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF"
+throwPartsButton.Parent = tab1Content
 Instance.new("UICorner", throwPartsButton).CornerRadius = UDim.new(0, 6)
 
 local returnButton = Instance.new("TextButton")
 returnButton.Size = UDim2.new(0, 160, 0, 28)
-returnButton.Position = UDim2.new(0, 10, 0, 258)
+returnButton.Position = UDim2.new(0, 2, 0, 222)
 returnButton.BackgroundColor3 = Color3.fromRGB(50, 150, 100)
 returnButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 returnButton.TextSize = 12
 returnButton.Font = Enum.Font.SourceSansBold
 returnButton.Text = "Voltar ao Local Anterior"
-returnButton.Parent = mainFrame
+returnButton.Parent = tab1Content
 Instance.new("UICorner", returnButton).CornerRadius = UDim.new(0, 6)
 
--- Monitoramento automático de teleporte do jogo
-local lastPos = nil
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        if lastPos then
-            local dist = (root.Position - lastPos).Magnitude
-            if dist > 40 then
-                preTeleportPos = CFrame.new(lastPos)
-            end
-        end
-        lastPos = root.Position
-    end
-end)
 
-returnButton.MouseButton1Click:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root and preTeleportPos then
-        root.CFrame = preTeleportPos
-    end
-end)
+-- ELEMENTOS ABA 2 (Procurar em Servidores)
+local searchTargetBox = Instance.new("TextBox")
+searchTargetBox.Size = UDim2.new(0, 160, 0, 30)
+searchTargetBox.Position = UDim2.new(0, 2, 0, 15)
+searchTargetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+searchTargetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+searchTargetBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
+searchTargetBox.PlaceholderText = "Nome do alvo..."
+searchTargetBox.Text = savedConfig.searchTargetText or ""
+searchTargetBox.TextSize = 12
+searchTargetBox.Font = Enum.Font.SourceSans
+searchTargetBox.Parent = tab2Content
+Instance.new("UICorner", searchTargetBox).CornerRadius = UDim.new(0, 6)
 
+local hopStatusButton = Instance.new("TextButton")
+hopStatusButton.Size = UDim2.new(0, 160, 0, 32)
+hopStatusButton.Position = UDim2.new(0, 2, 0, 52)
+hopStatusButton.BackgroundColor3 = serverHopSearching and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(80, 80, 80)
+hopStatusButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+hopStatusButton.TextSize = 11
+hopStatusButton.Font = Enum.Font.SourceSansBold
+hopStatusButton.Text = serverHopSearching and "Procurar em Servidores: ON" or "Procurar em Servidores: OFF"
+hopStatusButton.Parent = tab2Content
+Instance.new("UICorner", hopStatusButton).CornerRadius = UDim.new(0, 6)
+
+
+-- Eventos de cliques
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -218,7 +301,7 @@ end)
 rejoinButton.MouseButton1Click:Connect(function()
     rejoinButton.Text = "Reconectando..."
     rejoinButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
-    pcall(function()
+    saveStateAndTeleport(function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end)
 end)
@@ -227,6 +310,30 @@ hopStatusButton.MouseButton1Click:Connect(function()
     serverHopSearching = not serverHopSearching
     hopStatusButton.Text = serverHopSearching and "Procurar em Servidores: ON" or "Procurar em Servidores: OFF"
     hopStatusButton.BackgroundColor3 = serverHopSearching and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(80, 80, 80)
+end)
+
+returnButton.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root and preTeleportPos then
+        root.CFrame = preTeleportPos
+    end
+end)
+
+-- Posição do jogador antes de teleporte
+local lastPos = nil
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        if lastPos then
+            local dist = (root.Position - lastPos).Magnitude
+            if dist > 40 then
+                preTeleportPos = CFrame.new(lastPos)
+            end
+        end
+        lastPos = root.Position
+    end
 end)
 
 local function getTargetPlayer()
@@ -250,12 +357,12 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- Sistema de Server Hop automático para achar o jogador digitado
+-- Loop de troca automática de servidor (Server Hop) da Aba 2
 task.spawn(function()
     while true do
         task.wait(5)
-        if serverHopSearching and not todosActive then
-            local query = targetBox.Text:lower()
+        if serverHopSearching then
+            local query = searchTargetBox.Text:lower()
             if query ~= "" then
                 local found = false
                 for _, player in ipairs(Players:GetPlayers()) do
@@ -268,23 +375,24 @@ task.spawn(function()
                     end
                 end
 
-                -- Se não encontrou o jogador neste servidor, vai para outro servidor
                 if not found then
                     hopStatusButton.Text = "Trocando de Servidor..."
-                    pcall(function()
-                        local servers = {}
-                        local req = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
-                        local data = HttpService:JSONDecode(req)
-                        if data and data.data then
-                            for _, s in ipairs(data.data) do
-                                if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
-                                    table.insert(servers, s.id)
+                    saveStateAndTeleport(function()
+                        pcall(function()
+                            local servers = {}
+                            local req = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+                            local data = HttpService:JSONDecode(req)
+                            if data and data.data then
+                                for _, s in ipairs(data.data) do
+                                    if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                                        table.insert(servers, s.id)
+                                    end
                                 end
                             end
-                        end
-                        if #servers > 0 then
-                            TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
-                        end
+                            if #servers > 0 then
+                                TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+                            end
+                        end)
                     end)
                     task.wait(10)
                 end
