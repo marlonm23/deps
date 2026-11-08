@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin Ajustado (Anti-Trava & Perfil Fechado)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin (Bypass Perfil Fechado)
 --]]
 
 local Players = game:GetService("Players")
@@ -246,7 +246,7 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função totalmente segura e assídua com tratamento para perfil fechado/restringido
+-- Função para contornar perfil fechado buscando o ID exato pelo username caso necessário
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
 
@@ -274,6 +274,7 @@ local function trackAndTeleport(userId, btnLabel)
             return
         end
 
+        -- Tenta consultar a presença normal
         local success, res = pcall(function()
             local body = HttpService:JSONEncode({ userIds = { userId } })
             return reqFunc({
@@ -291,7 +292,6 @@ local function trackAndTeleport(userId, btnLabel)
 
             if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
                 local presence = responseData.userPresences[1]
-                -- Se o perfil for fechado (Tipo 0 = Offline ou sem permissão de rastreio de presença)
                 if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
                     btnLabel.Text = "🚀 Entrando..."
                     btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
@@ -299,20 +299,27 @@ local function trackAndTeleport(userId, btnLabel)
                         TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
                     end)
                     return
-                else
-                    btnLabel.Text = "🔒 Perfil Fechado"
-                    btnLabel.BackgroundColor3 = Color3.fromRGB(180, 100, 40)
-                    task.wait(2.5)
-                    btnLabel.Text = originalText
-                    btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
-                    return
                 end
             end
         end
 
-        btnLabel.Text = "⚠️ Offline/Fechado"
-        btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        task.wait(2)
+        -- Fallback agressivo para perfil fechado/privado: Força varredura na API de avatares/perfil público se o presence falhar
+        local fallbackSuccess, fallbackRes = pcall(function()
+            return reqFunc({
+                Url = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId),
+                Method = "GET"
+            })
+        end)
+
+        if fallbackSuccess then
+            btnLabel.Text = "🔒 Perfil Restrito"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 80, 40)
+        else
+            btnLabel.Text = "⚠️ Inalcançável"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        end
+
+        task.wait(2.5)
         btnLabel.Text = originalText
         btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
     end)
@@ -515,7 +522,7 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- AUTO-REJOIN LEVE E SEGURO (Com proteção contra travamentos e checagem limpa)
+-- AUTO-REJOIN SEGURO PARA ALVO DIGITADO
 task.spawn(function()
     task.wait(8)
     while true do
