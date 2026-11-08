@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Avatar Matcher (Bypass Perfil Fechado)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Target em Tools/Acessórios
 --]]
 
 local Players = game:GetService("Players")
@@ -209,7 +209,7 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar por Avatar Matcher)
+-- ELEMENTOS ABA 2
 local filterBox = Instance.new("TextBox")
 filterBox.Size = UDim2.new(1, 0, 0, 28)
 filterBox.Position = UDim2.new(0, 0, 0, 0)
@@ -246,7 +246,29 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função de Rastreio com Avatar Matcher (Bypass de Perfil Fechado por Comparação de Miniaturas)
+-- Função para obter peças acessíveis do alvo (incluindo Tools e Acessórios)
+local function getTargetHitParts(character)
+    local parts = {}
+    if not character then return parts end
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if root then table.insert(parts, root) end
+
+    for _, obj in ipairs(character:GetChildren()) do
+        if obj:IsA("Accessory") or obj:IsA("Tool") then
+            local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildOfClass("BasePart")
+            if handle and handle:IsA("BasePart") then
+                table.insert(parts, handle)
+            end
+        elseif obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" then
+            table.insert(parts, obj)
+        end
+    end
+
+    return parts
+end
+
+-- Rastreio Avatar Matcher
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
 
@@ -274,7 +296,6 @@ local function trackAndTeleport(userId, btnLabel)
             return
         end
 
-        -- 1. Pega a URL do headshot do avatar do alvo
         local headshotUrl = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId)
         local headshotRes = pcall(function() return reqFunc({ Url = headshotUrl, Method = "GET" }) end)
         
@@ -297,7 +318,6 @@ local function trackAndTeleport(userId, btnLabel)
 
         local targetImageUrl = headshotData.data[1].imageUrl
 
-        -- 2. Varre os servidores públicos em busca do match da imagem do avatar
         local cursor = ""
         local foundJobId = nil
 
@@ -367,7 +387,7 @@ local function trackAndTeleport(userId, btnLabel)
     end)
 end
 
--- Carrega o JSON em background total
+-- Carrega o JSON
 local enemiesList = {}
 
 local function loadEnemiesJSON()
@@ -400,18 +420,6 @@ local function loadEnemiesJSON()
             if entry.name and entry.id then
                 table.insert(enemiesList, { name = tostring(entry.name), id = tonumber(entry.id) })
             end
-        end
-
-        if #enemiesList == 0 then
-            local emptyLbl = Instance.new("TextLabel")
-            emptyLbl.Size = UDim2.new(1, 0, 0, 30)
-            emptyLbl.BackgroundTransparency = 1
-            emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
-            emptyLbl.TextSize = 11
-            emptyLbl.Font = Enum.Font.SourceSans
-            emptyLbl.Text = "Nenhum inimigo encontrado!"
-            emptyLbl.Parent = enemiesScroll
-            return
         end
 
         for _, enemy in ipairs(enemiesList) do
@@ -451,7 +459,6 @@ local function loadEnemiesJSON()
     end)
 end
 
--- Filtro dinâmico por nome ao digitar
 filterBox:GetPropertyChangedSignal("Text"):Connect(function()
     local query = filterBox.Text:lower()
     local visibleCount = 0
@@ -472,7 +479,7 @@ end)
 
 loadEnemiesJSON()
 
--- Eventos de controles padrões
+-- Eventos de botões
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -596,7 +603,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso dos Blocos Pretos da Lava
+-- Loop de Arremesso dos Blocos Pretos (Focado em Tools e Acessórios)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -622,34 +629,37 @@ task.spawn(function()
             end
         end
 
-        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-            local targetRoot = targetChar.HumanoidRootPart
+        if targetChar then
+            local hitParts = getTargetHitParts(targetChar)
             
-            for _, part in ipairs(Workspace:GetDescendants()) do
-                if not throwPartsActive then break end
-                
-                if part:IsA("BasePart") and not part.Anchored then
-                    local color = part.Color
-                    local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
+            if #hitParts > 0 then
+                for _, part in ipairs(Workspace:GetDescendants()) do
+                    if not throwPartsActive then break end
                     
-                    if isBlack then
-                        local isCharacterPart = false
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p.Character and part:IsDescendantOf(p.Character) then
-                                isCharacterPart = true
-                                break
+                    if part:IsA("BasePart") and not part.Anchored then
+                        local color = part.Color
+                        local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
+                        
+                        if isBlack then
+                            local isCharacterPart = false
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p.Character and part:IsDescendantOf(p.Character) then
+                                    isCharacterPart = true
+                                    break
+                                end
                             end
-                        end
 
-                        if not isCharacterPart then
-                            pcall(function()
-                                part.CanCollide = true
-                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
-                                
-                                local direction = (targetRoot.Position - part.Position).Unit
-                                part.AssemblyLinearVelocity = direction * 400 + Vector3.new(0, 60, 0)
-                                part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
-                            end)
+                            if not isCharacterPart then
+                                local selectedHitPart = hitParts[math.random(1, #hitParts)]
+                                pcall(function()
+                                    part.CanCollide = true
+                                    part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                                    
+                                    local direction = (selectedHitPart.Position - part.Position).Unit
+                                    part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 50, 0)
+                                    part.AssemblyAngularVelocity = Vector3.new(4000, 4000, 4000)
+                                end)
+                            end
                         end
                     end
                 end
