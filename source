@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Trava por Congelamento (Vida Cheia)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Balloon/Ragdoll Admin
 --]]
 
 local Players = game:GetService("Players")
@@ -209,45 +209,42 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- DETECTOR INTELIGENTE DE CONGELAMENTO (Mesmo com vida cheia)
+-- DETECTOR AUTOMÁTICO DE BALLOON / RAGDOLL DE ADMIN (Caixas, Textos e Tags)
 task.spawn(function()
-    local lastCheckPos = nil
-    local freezeTimer = 0
-
     while true do
-        task.wait(0.5)
+        task.wait(0.2)
         local char = LocalPlayer.Character
         if char then
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            local root = char:FindFirstChild("HumanoidRootPart")
+            local isTrappedByAdmin = false
 
-            -- Se a vida acabou, reseta na hora
-            if humanoid and humanoid.Health <= 0 then
-                pcall(function() char:BreakJoints() end)
-                freezeTimer = 0
-            elseif root and humanoid and humanoid.Health > 0 then
-                -- Se o boneco estiver tentando andar (MoveDirection maior que zero) mas a posição não muda
-                if humanoid.MoveDirection.Magnitude > 0 then
-                    if lastCheckPos then
-                        local distanceMoved = (root.Position - lastCheckPos).Magnitude
-                        -- Se moveu menos de 0.5 studs em meio segundo tentando andar, está travado!
-                        if distanceMoved < 0.5 then
-                            freezeTimer = freezeTimer + 0.5
-                            if freezeTimer >= 2.0 then -- 2 segundos preso = reset forçado
-                                pcall(function()
-                                    char:BreakJoints()
-                                end)
-                                freezeTimer = 0
-                            end
-                        else
-                            freezeTimer = 0
+            -- 1. Verifica se há objetos com nomes suspeitos (balloon, ragdoll, trap, fly, freeze) no personagem
+            for _, obj in ipairs(char:GetDescendants()) do
+                local name = obj.Name:lower()
+                if name:find("balloon") or name:find("ragdoll") or name:find("trap") or name:find("freeze") or name:find("bexiga") then
+                    isTrappedByAdmin = true
+                    break
+                end
+            end
+
+            -- 2. Verifica se apareceu alguma caixa de texto (BillboardGui/TextLabel) na tela ou no boneco com o comando do admin
+            if not isTrappedByAdmin then
+                for _, gui in ipairs(PlayerGui:GetDescendants()) do
+                    if gui:IsA("TextLabel") and gui.Visible then
+                        local text = gui.Text:lower()
+                        if text:find("balloon") or text:find("ragdoll") or text:find("admin") then
+                            isTrappedByAdmin = true
+                            break
                         end
                     end
-                    lastCheckPos = root.Position
-                else
-                    freezeTimer = 0
-                    lastCheckPos = root.Position
                 end
+            end
+
+            -- Se detectou o ataque do admin, destrói as juntas na hora para resetar limpo
+            if isTrappedByAdmin then
+                pcall(function()
+                    char:BreakJoints()
+                end)
+                task.wait(1.0) -- Aguarda o respawn
             end
         end
     end
@@ -598,7 +595,7 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- ANTI-FLING (Protege você e anula a velocidade de outros exploiters)
+-- ANTI-FLING
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
         pcall(function()
