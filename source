@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos CSV Ajustado + Filtro + Localizar
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar
 --]]
 
 local Players = game:GetService("Players")
@@ -27,7 +27,7 @@ local throwPartsActive = savedConfig.throwPartsActive
 
 local preTeleportPos = nil
 local scriptUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source"
-local csvUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/id"
+local jsonUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/id"
 
 local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
@@ -63,7 +63,7 @@ end
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = PlayerGui
+screenGui.Parent = screenGui
 
 -- Janela Principal
 local mainFrame = Instance.new("Frame")
@@ -128,7 +128,7 @@ tab2Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
 tab2Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
 tab2Btn.TextSize = 11
 tab2Btn.Font = Enum.Font.SourceSansBold
-tab2Btn.Text = "Inimigos CSV"
+tab2Btn.Text = "Inimigos JSON"
 tab2Btn.Parent = tabContainer
 Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 6)
 
@@ -209,7 +209,7 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- ELEMENTOS ABA 2 (Inimigos CSV com Filtro e Botões de Localizar)
+-- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar)
 local filterBox = Instance.new("TextBox")
 filterBox.Size = UDim2.new(1, 0, 0, 28)
 filterBox.Position = UDim2.new(0, 0, 0, 0)
@@ -243,7 +243,7 @@ statusCsvLabel.BackgroundTransparency = 1
 statusCsvLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
 statusCsvLabel.TextSize = 11
 statusCsvLabel.Font = Enum.Font.SourceSansBold
-statusCsvLabel.Text = "Baixando lista do GitHub..."
+statusCsvLabel.Text = "Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
 -- Função para localizar um UserId via API com antitrava
@@ -305,10 +305,10 @@ local function trackAndTeleport(userId, btnLabel)
     end)
 end
 
--- Carrega e processa o arquivo CSV direto do GitHub de forma flexível
+-- Carrega e decodifica o JSON direto do GitHub
 local enemiesList = {}
 
-local function loadEnemiesCSV()
+local function loadEnemiesJSON()
     for _, child in ipairs(enemiesScroll:GetChildren()) do
         if child:IsA("Frame") or child == statusCsvLabel then
             child:Destroy()
@@ -316,12 +316,23 @@ local function loadEnemiesCSV()
     end
     enemiesList = {}
 
-    local success, csvData = pcall(function()
-        return game:HttpGet(csvUrl)
+    local success, rawData = pcall(function()
+        return game:HttpGet(jsonUrl)
     end)
 
-    if not success or not csvData then
-        statusCsvLabel.Text = "Erro ao baixar o link do GitHub!"
+    if not success or not rawData then
+        statusCsvLabel.Text = "Erro ao baixar o JSON do GitHub!"
+        statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+        enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
+        return
+    end
+
+    local decodeSuccess, decodedData = pcall(function()
+        return HttpService:JSONDecode(rawData)
+    end)
+
+    if not decodeSuccess or not decodedData then
+        statusCsvLabel.Text = "Erro ao decodificar o JSON!"
         statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
         enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
         return
@@ -329,21 +340,9 @@ local function loadEnemiesCSV()
 
     statusCsvLabel:Destroy()
 
-    -- Lê linha por linha aceitando qualquer separador por ponto e vírgula ou espaço
-    for line in csvData:gmatch("[^\r\n]+") do
-        if not line:match("^%s*#") then -- Ignora comentários caso haja
-            local name, idStr = line:match("([^;]+);([^;]+)")
-            if not name then
-                name, idStr = line:match("(%S+)%s+(%d+)")
-            end
-            
-            if name and idStr then
-                name = name:gsub("^%s+", ""):gsub("%s+$", "")
-                local userId = tonumber(idStr:gsub("%D+", ""))
-                if userId then
-                    table.insert(enemiesList, { name = name, id = userId })
-                end
-            end
+    for _, entry in ipairs(decodedData) do
+        if entry.name and entry.id then
+            table.insert(enemiesList, { name = tostring(entry.name), id = tonumber(entry.id) })
         end
     end
 
@@ -354,7 +353,7 @@ local function loadEnemiesCSV()
         emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
         emptyLbl.TextSize = 11
         emptyLbl.Font = Enum.Font.SourceSans
-        emptyLbl.Text = "Nenhum nome lido! Verifique o formato no GitHub."
+        emptyLbl.Text = "Nenhum inimigo encontrado no JSON!"
         emptyLbl.Parent = enemiesScroll
         return
     end
@@ -416,7 +415,7 @@ filterBox:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 -- Carrega os inimigos ao iniciar
-task.spawn(loadEnemiesCSV)
+task.spawn(loadEnemiesJSON)
 
 -- Eventos de controles padrões
 flingButton.MouseButton1Click:Connect(function()
