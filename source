@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Trava de Reset Automático
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Trava por Congelamento (Vida Cheia)
 --]]
 
 local Players = game:GetService("Players")
@@ -209,9 +209,11 @@ end)
 local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
--- DETECTOR AUTOMÁTICO DE PERSONAGEM TRAVADO
+-- DETECTOR INTELIGENTE DE CONGELAMENTO (Mesmo com vida cheia)
 task.spawn(function()
-    local stuckTimer = 0
+    local lastCheckPos = nil
+    local freezeTimer = 0
+
     while true do
         task.wait(0.5)
         local char = LocalPlayer.Character
@@ -219,26 +221,33 @@ task.spawn(function()
             local humanoid = char:FindFirstChildOfClass("Humanoid")
             local root = char:FindFirstChild("HumanoidRootPart")
 
-            -- Se a vida for 0 mas o personagem continuar "vivo" no Workspace por mais de 1.5s (trava clássica de reset)
+            -- Se a vida acabou, reseta na hora
             if humanoid and humanoid.Health <= 0 then
-                stuckTimer = stuckTimer + 0.5
-                if stuckTimer >= 1.5 then
-                    pcall(function()
-                        char:BreakJoints()
-                    end)
-                    stuckTimer = 0
+                pcall(function() char:BreakJoints() end)
+                freezeTimer = 0
+            elseif root and humanoid and humanoid.Health > 0 then
+                -- Se o boneco estiver tentando andar (MoveDirection maior que zero) mas a posição não muda
+                if humanoid.MoveDirection.Magnitude > 0 then
+                    if lastCheckPos then
+                        local distanceMoved = (root.Position - lastCheckPos).Magnitude
+                        -- Se moveu menos de 0.5 studs em meio segundo tentando andar, está travado!
+                        if distanceMoved < 0.5 then
+                            freezeTimer = freezeTimer + 0.5
+                            if freezeTimer >= 2.0 then -- 2 segundos preso = reset forçado
+                                pcall(function()
+                                    char:BreakJoints()
+                                end)
+                                freezeTimer = 0
+                            end
+                        else
+                            freezeTimer = 0
+                        end
+                    end
+                    lastCheckPos = root.Position
+                else
+                    freezeTimer = 0
+                    lastCheckPos = root.Position
                 end
-            -- Se o boneco perder o HumanoidRootPart ou o Humanoid for destruído pelo jogo para te congelar
-            elseif not humanoid or not root then
-                stuckTimer = stuckTimer + 0.5
-                if stuckTimer >= 2 then
-                    pcall(function()
-                        char:BreakJoints()
-                    end)
-                    stuckTimer = 0
-                end
-            else
-                stuckTimer = 0
             end
         end
     end
@@ -589,6 +598,7 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
+-- ANTI-FLING (Protege você e anula a velocidade de outros exploiters)
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
         pcall(function()
@@ -599,11 +609,24 @@ end)
 
 RunService.Stepped:Connect(function()
     if not antiFlingActive then return end
+    
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if root and (root.AssemblyLinearVelocity.Magnitude > 300 or root.AssemblyAngularVelocity.Magnitude > 300) then
         root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
         root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local otherRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            if otherRoot and (otherRoot.AssemblyLinearVelocity.Magnitude > 250 or otherRoot.AssemblyAngularVelocity.Magnitude > 250) then
+                pcall(function()
+                    otherRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    otherRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                end)
+            end
+        end
     end
 end)
 
