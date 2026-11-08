@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin por Alvo (Corrigido)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin Ajustado (Anti-Trava & Perfil Fechado)
 --]]
 
 local Players = game:GetService("Players")
@@ -246,7 +246,7 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função totalmente assíncrona com defer para nunca travar o frame do jogo
+-- Função totalmente segura e assídua com tratamento para perfil fechado/restringido
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
 
@@ -291,12 +291,20 @@ local function trackAndTeleport(userId, btnLabel)
 
             if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
                 local presence = responseData.userPresences[1]
+                -- Se o perfil for fechado (Tipo 0 = Offline ou sem permissão de rastreio de presença)
                 if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
                     btnLabel.Text = "🚀 Entrando..."
                     btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
                     saveStateAndTeleport(function()
                         TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
                     end)
+                    return
+                else
+                    btnLabel.Text = "🔒 Perfil Fechado"
+                    btnLabel.BackgroundColor3 = Color3.fromRGB(180, 100, 40)
+                    task.wait(2.5)
+                    btnLabel.Text = originalText
+                    btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
                     return
                 end
             end
@@ -507,52 +515,52 @@ local function isValidTarget(targetChar)
     return targetRoot and humanoid and humanoid.Health > 0
 end
 
--- AUTO-REJOIN LEVE BASEADO NO NOME DA CAIXINHA DA ABA 1
+-- AUTO-REJOIN LEVE E SEGURO (Com proteção contra travamentos e checagem limpa)
 task.spawn(function()
-    task.wait(8) -- Aguarda o jogo estabilizar ao entrar
+    task.wait(8)
     while true do
-        task.wait(2.0)
-        -- Só monitora se o Fling ou Jogar Blocos estiver ativo e houver texto na caixa de alvo
-        if (flingActive or throwPartsActive) and not todosActive then
-            local query = targetBox.Text:lower()
-            if query ~= "" and #query >= 2 then
-                local targetInServer = false
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer then
-                        local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
-                        if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
-                            targetInServer = true
-                            break
-                        end
-                    end
-                end
-
-                -- Se o alvo digitado não está no servidor, aguarda 3s de segurança e dá rejoin
-                if not targetInServer then
-                    task.wait(3.0)
-                    local doubleCheck = false
-                    local currentQuery = targetBox.Text:lower()
-                    if currentQuery == query then
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p ~= LocalPlayer then
-                                local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
-                                if pName:sub(1, #currentQuery) == currentQuery or pDisp:sub(1, #currentQuery) == currentQuery or pName:find(currentQuery) or pDisp:find(currentQuery) then
-                                    doubleCheck = true
-                                    break
-                                end
+        task.wait(3.0)
+        pcall(function()
+            if (flingActive or throwPartsActive) and not todosActive then
+                local query = targetBox.Text:lower()
+                if query ~= "" and #query >= 2 then
+                    local targetInServer = false
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer then
+                            local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
+                                targetInServer = true
+                                break
                             end
                         end
+                    end
 
-                        if not doubleCheck then
-                            saveStateAndTeleport(function()
-                                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-                            end)
-                            break
+                    if not targetInServer then
+                        task.wait(3.0)
+                        local currentQuery = targetBox.Text:lower()
+                        if currentQuery == query then
+                            local doubleCheck = false
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p ~= LocalPlayer then
+                                    local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                                    if pName:sub(1, #currentQuery) == currentQuery or pDisp:sub(1, #currentQuery) == currentQuery or pName:find(currentQuery) or pDisp:find(currentQuery) then
+                                        doubleCheck = true
+                                        break
+                                    end
+                                end
+                            end
+
+                            if not doubleCheck then
+                                saveStateAndTeleport(function()
+                                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                                end)
+                                return
+                            end
                         end
                     end
                 end
             end
-        end
+        end)
     end
 end)
 
