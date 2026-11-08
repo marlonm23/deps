@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar Fluido (Sem Travar)
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON via GitHub + Filtro + Localizar Ultra Fluido
 --]]
 
 local Players = game:GetService("Players")
@@ -246,14 +246,19 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para localizar um UserId via API com indicador visual de carregamento
+-- Função para rastrear sem travar a interface visual
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
-    
-    local originalText = btnLabel.Text
+
+    -- 1. Atualiza visualmente o botão instantaneamente
+    local originalText = "Localizar"
     btnLabel.Text = "🔄 Buscando..."
     btnLabel.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 
+    -- 2. Força o motor de renderização do Roblox a atualizar a tela antes de iniciar a requisição HTTP
+    RunService.RenderStepped:Wait()
+
+    -- 3. Roda a requisição isolada em thread paralela
     task.spawn(function()
         local inCurrentServer = Players:GetPlayerByUserId(userId)
         if inCurrentServer then
@@ -275,6 +280,8 @@ local function trackAndTeleport(userId, btnLabel)
         end
 
         local responseData = nil
+        local requestFinished = false
+
         task.spawn(function()
             pcall(function()
                 local body = HttpService:JSONEncode({ userIds = { userId } })
@@ -288,12 +295,13 @@ local function trackAndTeleport(userId, btnLabel)
                     responseData = HttpService:JSONDecode(res.Body)
                 end
             end)
+            requestFinished = true
         end)
 
-        -- Timeout dinâmico sem travar o thread principal
+        -- Timeout assíncrono de 2 segundos (não congela o jogo)
         local start = tick()
-        while not responseData and (tick() - start < 2.5) do
-            task.wait(0.1)
+        while not requestFinished and (tick() - start < 2.0) do
+            task.wait(0.05)
         end
 
         if responseData and responseData.userPresences and responseData.userPresences[1] then
@@ -312,7 +320,7 @@ local function trackAndTeleport(userId, btnLabel)
                 btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
             end
         else
-            btnLabel.Text = "❌ Erro API"
+            btnLabel.Text = "⚠️ Não Encontrado"
             btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
             task.wait(2)
             btnLabel.Text = originalText
