@@ -303,7 +303,7 @@ local function trackAndTeleport(userId, btnLabel)
             end
         end
 
-        -- Fallback agressivo para perfil fechado/privado: Força varredura na API de avatares/perfil público se o presence falhar
+        -- Fallback agressivo para perfil fechado/privado
         local fallbackSuccess, fallbackRes = pcall(function()
             return reqFunc({
                 Url = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId),
@@ -666,7 +666,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Padrão
+-- Loop Fling Padrão (Ajustado)
 task.spawn(function()
     while true do
         if not flingActive then
@@ -697,7 +697,7 @@ task.spawn(function()
                     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.15) do
+                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.35) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
                             if not character or not rootPart then break end
@@ -710,9 +710,9 @@ task.spawn(function()
                             end)
 
                             local randomOffset = CFrame.new(
-                                math.random(-150, 150) / 100, 
-                                math.random(-50, 100) / 100, 
-                                math.random(-150, 150) / 100
+                                math.random(-100, 100) / 100, 
+                                math.random(-30, 50) / 100, 
+                                math.random(-100, 100) / 100
                             )
                             rootPart.CFrame = targetRoot.CFrame * randomOffset
                             rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
@@ -723,7 +723,7 @@ task.spawn(function()
                     end
                 end
             else
-                task.wait(0.5)
+                task.wait(0.3)
             end
         else
             local targetPlayer = getTargetPlayer()
@@ -745,9 +745,9 @@ task.spawn(function()
                         end)
                         
                         local randomOffset = CFrame.new(
-                            math.random(-150, 150) / 100, 
-                            math.random(-50, 100) / 100, 
-                            math.random(-150, 150) / 100
+                            math.random(-100, 100) / 100, 
+                            math.random(-30, 50) / 100, 
+                            math.random(-100, 100) / 100
                         )
                         rootPart.CFrame = targetRoot.CFrame * randomOffset
                         rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
@@ -757,7 +757,7 @@ task.spawn(function()
                     end
                 end
             else
-                task.wait(0.5)
+                task.wait(0.3)
             end
         end
     end
