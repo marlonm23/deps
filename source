@@ -509,7 +509,6 @@ local function getTargetPlayer()
     return nil
 end
 
--- CORREÇÃO: Validação flexível que apenas exige o HumanoidRootPart, funcionando independente de estar andando ou parado
 local function isValidTarget(targetChar)
     if not targetChar then return false end
     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
@@ -597,8 +596,11 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso dos Blocos Pretos da Lava
+-- Loop Otimizado de Arremesso dos Blocos Pretos da Lava (Com Cache Inteligente)
 task.spawn(function()
+    local cacheParts = {}
+    local lastCacheUpdate = 0
+
     while true do
         if not throwPartsActive then
             task.wait(0.2)
@@ -625,42 +627,53 @@ task.spawn(function()
 
         if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
             local targetRoot = targetChar.HumanoidRootPart
-            
-            for _, part in ipairs(Workspace:GetDescendants()) do
-                if not throwPartsActive then break end
-                
-                if part:IsA("BasePart") and not part.Anchored then
-                    local color = part.Color
-                    local isBlack = color.R < 0.15 and color.G < 0.15 and color.B < 0.15
-                    
-                    if isBlack then
-                        local isCharacterPart = false
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p.Character and part:IsDescendantOf(p.Character) then
-                                isCharacterPart = true
-                                break
-                            end
-                        end
+            local currentTime = tick()
 
-                        if not isCharacterPart then
-                            pcall(function()
-                                part.CanCollide = true
-                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
-                                
-                                local direction = (targetRoot.Position - part.Position).Unit
-                                part.AssemblyLinearVelocity = direction * 400 + Vector3.new(0, 60, 0)
-                                part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
-                            end)
+            if currentTime - lastCacheUpdate > 1.0 or #cacheParts == 0 then
+                cacheParts = {}
+                for _, part in ipairs(Workspace:GetDescendants()) do
+                    if part:IsA("BasePart") and not part.Anchored then
+                        local color = part.Color
+                        if color.R < 0.15 and color.G < 0.15 and color.B < 0.15 then
+                            local isCharacterPart = false
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p.Character and part:IsDescendantOf(p.Character) then
+                                    isCharacterPart = true
+                                    break
+                                end
+                            end
+                            if not isCharacterPart then
+                                table.insert(cacheParts, part)
+                            end
                         end
                     end
                 end
+                lastCacheUpdate = currentTime
+            end
+
+            for i = #cacheParts, 1, -1 do
+                if not throwPartsActive then break end
+                local part = cacheParts[i]
+                
+                if part and part.Parent then
+                    pcall(function()
+                        part.CanCollide = true
+                        part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                        
+                        local direction = (targetRoot.Position - part.Position).Unit
+                        part.AssemblyLinearVelocity = direction * 400 + Vector3.new(0, 60, 0)
+                        part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
+                    end)
+                else
+                    table.remove(cacheParts, i)
+                end
             end
         end
-        task.wait(0.1)
+        task.wait(0.05)
     end
 end)
 
--- Loop Fling Padrão (Ajustado)
+-- Loop Fling Padrão
 task.spawn(function()
     while true do
         if not flingActive then
