@@ -596,11 +596,8 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop Otimizado de Arremesso dos Blocos Pretos da Lava (Com Cache Inteligente)
+-- Loop de Arremesso Direto e Contínuo dos Blocos Pretos da Lava
 task.spawn(function()
-    local cacheParts = {}
-    local lastCacheUpdate = 0
-
     while true do
         if not throwPartsActive then
             task.wait(0.2)
@@ -627,49 +624,38 @@ task.spawn(function()
 
         if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
             local targetRoot = targetChar.HumanoidRootPart
-            local currentTime = tick()
+            
+            for _, part in ipairs(Workspace:GetDescendants()) do
+                if not throwPartsActive then break end
+                
+                if part:IsA("BasePart") and not part.Anchored then
+                    local color = part.Color
+                    local isBlack = color.R < 0.18 and color.G < 0.18 and color.B < 0.18
+                    
+                    if isBlack then
+                        local isCharacterPart = false
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p.Character and part:IsDescendantOf(p.Character) then
+                                isCharacterPart = true
+                                break
+                            end
+                        end
 
-            if currentTime - lastCacheUpdate > 1.0 or #cacheParts == 0 then
-                cacheParts = {}
-                for _, part in ipairs(Workspace:GetDescendants()) do
-                    if part:IsA("BasePart") and not part.Anchored then
-                        local color = part.Color
-                        if color.R < 0.15 and color.G < 0.15 and color.B < 0.15 then
-                            local isCharacterPart = false
-                            for _, p in ipairs(Players:GetPlayers()) do
-                                if p.Character and part:IsDescendantOf(p.Character) then
-                                    isCharacterPart = true
-                                    break
-                                end
-                            end
-                            if not isCharacterPart then
-                                table.insert(cacheParts, part)
-                            end
+                        if not isCharacterPart then
+                            pcall(function()
+                                part.CanCollide = true
+                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                                
+                                local direction = (targetRoot.Position - part.Position).Unit
+                                part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
+                                part.AssemblyAngularVelocity = Vector3.new(4000, 4000, 4000)
+                            end)
                         end
                     end
                 end
-                lastCacheUpdate = currentTime
-            end
-
-            for i = #cacheParts, 1, -1 do
-                if not throwPartsActive then break end
-                local part = cacheParts[i]
-                
-                if part and part.Parent then
-                    pcall(function()
-                        part.CanCollide = true
-                        part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
-                        
-                        local direction = (targetRoot.Position - part.Position).Unit
-                        part.AssemblyLinearVelocity = direction * 400 + Vector3.new(0, 60, 0)
-                        part.AssemblyAngularVelocity = Vector3.new(3000, 3000, 3000)
-                    end)
-                else
-                    table.remove(cacheParts, i)
-                end
             end
         end
-        task.wait(0.05)
+        task.wait(0.02)
     end
 end)
 
