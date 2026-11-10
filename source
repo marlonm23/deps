@@ -246,7 +246,6 @@ statusCsvLabel.Font = Enum.Font.SourceSansBold
 statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
 statusCsvLabel.Parent = enemiesScroll
 
--- Função para contornar perfil fechado buscando o ID exato pelo username caso necessário
 local function trackAndTeleport(userId, btnLabel)
     if btnLabel.Text:find("Buscando") then return end
 
@@ -274,7 +273,6 @@ local function trackAndTeleport(userId, btnLabel)
             return
         end
 
-        -- Tenta consultar a presença normal
         local success, res = pcall(function()
             local body = HttpService:JSONEncode({ userIds = { userId } })
             return reqFunc({
@@ -303,7 +301,6 @@ local function trackAndTeleport(userId, btnLabel)
             end
         end
 
-        -- Fallback agressivo para perfil fechado/privado
         local fallbackSuccess, fallbackRes = pcall(function()
             return reqFunc({
                 Url = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId),
@@ -325,7 +322,6 @@ local function trackAndTeleport(userId, btnLabel)
     end)
 end
 
--- Carrega o JSON em background total
 local enemiesList = {}
 
 local function loadEnemiesJSON()
@@ -409,7 +405,6 @@ local function loadEnemiesJSON()
     end)
 end
 
--- Filtro dinâmico por nome ao digitar
 filterBox:GetPropertyChangedSignal("Text"):Connect(function()
     local query = filterBox.Text:lower()
     local visibleCount = 0
@@ -430,7 +425,6 @@ end)
 
 loadEnemiesJSON()
 
--- Eventos de controles padrões
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
     flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
@@ -515,11 +509,11 @@ local function getTargetPlayer()
     return nil
 end
 
+-- CORREÇÃO: Validação flexível que apenas exige o HumanoidRootPart, funcionando independente de estar andando ou parado
 local function isValidTarget(targetChar)
     if not targetChar then return false end
     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-    local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-    return targetRoot and humanoid and humanoid.Health > 0
+    return targetRoot ~= nil
 end
 
 -- AUTO-REJOIN SEGURO PARA ALVO DIGITADO
