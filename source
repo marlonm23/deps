@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin (Bypass Perfil Fechado)
+    Script: Mass Walkfling + Jogar Blocos (Qualquer Peça Solta) + Inimigos JSON + Anti-Fling + Auto-Rejoin (Bypass Perfil Fechado)
 --]]
 
 local Players = game:GetService("Players")
@@ -596,7 +596,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop de Arremesso Direto e Contínuo dos Blocos Pretos da Lava
+-- Loop de Arremesso Direto e Contínuo de Todas as Peças Soltas
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -628,29 +628,26 @@ task.spawn(function()
             for _, part in ipairs(Workspace:GetDescendants()) do
                 if not throwPartsActive then break end
                 
+                -- Pega qualquer peça que seja BasePart e não esteja ancorada
                 if part:IsA("BasePart") and not part.Anchored then
-                    local color = part.Color
-                    local isBlack = color.R < 0.18 and color.G < 0.18 and color.B < 0.18
-                    
-                    if isBlack then
-                        local isCharacterPart = false
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p.Character and part:IsDescendantOf(p.Character) then
-                                isCharacterPart = true
-                                break
-                            end
+                    local isCharacterPart = false
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p.Character and part:IsDescendantOf(p.Character) then
+                            isCharacterPart = true
+                            break
                         end
+                    end
 
-                        if not isCharacterPart then
-                            pcall(function()
-                                part.CanCollide = true
-                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
-                                
-                                local direction = (targetRoot.Position - part.Position).Unit
-                                part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
-                                part.AssemblyAngularVelocity = Vector3.new(4000, 4000, 4000)
-                            end)
-                        end
+                    -- Se não for parte do corpo de um jogador, arremessa
+                    if not isCharacterPart then
+                        pcall(function()
+                            part.CanCollide = true
+                            part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                            
+                            local direction = (targetRoot.Position - part.Position).Unit
+                            part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
+                            part.AssemblyAngularVelocity = Vector3.new(4000, 4000, 4000)
+                        end)
                     end
                 end
             end
