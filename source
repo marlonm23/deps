@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Automáticos + Inimigos JSON + Anti-Fling + Auto-Rejoin + Server Teleport
+    Script: Mass Walkfling + Órbita Automática de Blocos + Inimigos JSON + Anti-Fling + Auto-Rejoin + Server Teleport
 --]]
 
 local Players = game:GetService("Players")
@@ -680,7 +680,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop Automático Inteligente: Descobre e Arremessa QUALQUER Bloco Dinâmico Próximo na Direção do Alvo
+-- Loop de Órbita Automática de Blocos (Gira blocos em volta do alvo sem você estar perto)
 task.spawn(function()
     while true do
         if not throwPartsActive then
@@ -708,14 +708,13 @@ task.spawn(function()
 
         if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
             local targetRoot = targetChar.HumanoidRootPart
-            local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local angleStep = 0
             
-            -- Varre automaticamente todas as partes físicas do Workspace sem precisar restringir a cor preta
+            -- Pega todos os blocos dinâmicos próximos e faz orbitar o alvo autonomamente
             for _, part in ipairs(Workspace:GetDescendants()) do
                 if not throwPartsActive then break end
                 
                 if part:IsA("BasePart") and not part.Anchored and not part.Locked then
-                    -- Ignora partes do próprio jogador ou de outros players
                     local isCharacterPart = false
                     for _, p in ipairs(Players:GetPlayers()) do
                         if p.Character and part:IsDescendantOf(p.Character) then
@@ -725,17 +724,23 @@ task.spawn(function()
                     end
 
                     if not isCharacterPart then
-                        -- Verifica se o bloco está relativamente perto para ser controlado
                         local distToTarget = (part.Position - targetRoot.Position).Magnitude
-                        if distToTarget < 150 then
+                        if distToTarget < 120 then
                             pcall(function()
                                 part.CanCollide = true
                                 part.CustomPhysicalProperties = PhysicalProperties.new(100, 2, 2, 2, 2)
                                 
-                                -- Dispara o bloco automaticamente direto na cabeça/corpo do alvo com força absoluta
-                                local direction = (targetRoot.Position - part.Position).Unit
-                                part.AssemblyLinearVelocity = direction * 600 + Vector3.new(0, 150, 0)
-                                part.AssemblyAngularVelocity = Vector3.new(8000, 8000, 8000)
+                                -- Cria um redemoinho/órbita automática ao redor do personagem do alvo
+                                angleStep = angleStep + 0.5
+                                local radius = 4
+                                local orbitX = math.cos(tick() * 15 + angleStep) * radius
+                                local orbitZ = math.sin(tick() * 15 + angleStep) * radius
+                                
+                                local targetPos = targetRoot.Position + Vector3.new(orbitX, 2, orbitZ)
+                                local direction = (targetPos - part.Position)
+                                
+                                part.AssemblyLinearVelocity = direction * 50 + Vector3.new(0, 50, 0)
+                                part.AssemblyAngularVelocity = Vector3.new(9000, 9000, 9000)
                             end)
                         end
                     end
@@ -773,12 +778,10 @@ task.spawn(function()
             end)
 
             if scriptFightActive then
-                -- MODO LUTA DE SCRIPT EXTREMO: Força o personagem a atravessar colisão com velocidade estourada para cima e para fora
                 rootPart.CFrame = targetRoot.CFrame + Vector3.new(0, 1, 0)
                 rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-99999, 99999), 85000, math.random(-99999, 99999))
                 rootPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
             else
-                -- MODO FLING NORMAL: Afunda para baixo direto no void
                 local randomOffset = CFrame.new(
                     math.random(-80, 80) / 100, 
                     math.random(-20, 20) / 100, 
@@ -822,7 +825,6 @@ task.spawn(function()
             local targetPlayer = getTargetPlayer()
             if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
                 local targetChar = targetPlayer.Character
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootColor" or "HumanoidRootPart") -- mantido seguro
                 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot then
@@ -831,7 +833,6 @@ task.spawn(function()
                         rootPart = character and character:FindFirstChild("HumanoidRootPart")
                         if not character or not rootPart then break end
                         
-                        applyFlipped = true -- dummy
                         applyFlingForce(targetRoot)
                         RunService.Heartbeat:Wait()
                     end
