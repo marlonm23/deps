@@ -533,8 +533,27 @@ antiFlingButton.MouseButton1Click:Connect(function()
     antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
+-- SISTEMA DE GERENCIAMENTO DE CONSTRAINTS DE PROTEÇÃO
+local guardConstraints = {}
+local function clearGuardConstraints()
+    for _, nc in ipairs(guardConstraints) do
+        pcall(function() nc:Destroy() end)
+    end
+    table.clear(guardConstraints)
+end
+
 guardButton.MouseButton1Click:Connect(function()
     guardActive = not guardActive
+    if not guardActive then
+        clearGuardConstraints()
+        local targetPlayer = getTargetPlayer()
+        if targetPlayer and targetPlayer.Character then
+            local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+            end
+        end
+    end
     guardButton.Text = guardActive and "Proteção: ON" or "Proteção: OFF"
     guardButton.BackgroundColor3 = guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
@@ -610,9 +629,16 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
--- SISTEMA DE PROTEÇÃO ABSOLUTA (Trava a posição do alvo e zera o deslocamento dele para que ele não vá até os outros)
+-- SISTEMA DE PROTEÇÃO TOTAL ANTI-FLING E ISOLAMENTO DE COLISÃO
+local lastGuardedChar = nil
 RunService.Stepped:Connect(function()
-    if not guardActive then return end
+    if not guardActive then
+        if #guardConstraints > 0 then
+            clearGuardConstraints()
+            lastGuardedChar = nil
+        end
+        return
+    end
 
     local targetPlayer = getTargetPlayer()
     if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
@@ -624,128 +650,76 @@ RunService.Stepped:Connect(function()
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
         if targetRoot and myRoot then
+            if lastGuardedChar ~= targetChar then
+                clearGuardConstraints()
+                lastGuardedChar = targetChar
+            end
+
             pcall(function()
-                -- Desativa o movimento do humanoid do alvo protegido para impedir que ele caminhe até os outros
+                -- Congela a movimentação autônoma do alvo protegido para que ele não ande até os outros
                 if targetHumanoid then
                     targetHumanoid.PlatformStand = true
-                    targetHumanoid.WalkSpeed = 0
-                    targetHumanoid.JumpPower = 0
                 end
 
-                -- Zera as velocidades de física para bloquear qualquer fling ou deslocamento em massa
+                -- Zera impulsos de fling no alvo
                 targetRoot.AssemblyLinearVelocity = Vector3.zero
                 targetRoot.AssemblyAngularVelocity = Vector3.zero
-                targetRoot.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
 
-                -- DESATIVA A COLISÃO DO ALVO COM TODO MUNDO, EXCETO VOCÊ
-                for _, part in ipairs(targetChar:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
+                -- CRIA NoCollisionConstraint entre o alvo protegido e TODOS OS OUTROS PLAYERS DO SERVIDOR (exceto você)
+                if #guardConstraints == 0 then
+                    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                        if otherPlayer ~= LocalPlayer and otherPlayer ~= targetPlayer and otherPlayer.Character then
+                            for _, tPart in ipairs(targetChar:GetDescendants()) do
+                                if tPart:IsA("BasePart") then
+                                    for _, oPart in ipairs(otherPlayer.Character:GetDescendants()) do
+                                        if oPart:IsA("BasePart") then
+                                            local nc = Instance.new("NoCollisionConstraint")
+                                            nc.Part0 = tPart
+                                            nc.Part1 = oPart
+                                            nc.Parent = tPart
+                                            table.insert(guardConstraints, nc)
+                                        end
+                                    end
+                                end
+                            end
+                        end
                     end
                 end
 
-                -- Mantém você colado exatamente na posição dele para absorver qualquer impacto no lugar
+                -- Mantém você rigorosamente colado nele para absorver qualquer dano/impacto
                 myRoot.CFrame = targetRoot.CFrame
                 myRoot.CanCollide = true
                 myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
             end)
         end
-    end
-end)
-
--- Restaura o estado normal do alvo quando a proteção é desligada
-guardButton.MouseButton1Click:Connect(function()
-    guardActive = not guardActive
-    if not guardActive then
-        local targetPlayer = getTargetPlayer()
-        if targetPlayer and targetPlayer.Character then
-            local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.PlatformStand = false
-                hum.WalkSpeed = 16
-                hum.JumpPower = 50
-            end
-            for _, part in ipairs(targetPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
+    else
+        if #guardConstraints > 0 then
+            clearGuardConstraints()
+            lastGuardedChar = nil
         end
     end
-    guardButton.Text = guardActive and "Proteção: ON" or "Proteção: OFF"
-    guardButton.BackgroundColor3 = guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
-invisibleButton.MouseButton1Click:Connect(function()
-    invisibleActive = not invisibleActive
-    local char = LocalPlayer.Character
-    if char then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("Decal") then
-                part.Transparency = invisibleActive and 1 or (part.Name == "HumanoidRootPart" and 1 or 0)
-            end
-        end
-    end
-    invisibleButton.Text = invisibleActive and "Invisível: ON" or "Invisível: OFF"
-    invisibleButton.BackgroundColor3 = invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
-end)
-
-throwPartsButton.MouseButton1Click:Connect(function()
-    throwPartsActive = not throwPartsActive
-    throwPartsButton.Text = throwPartsActive and "Blocos no Peito: ON" or "Blocos no Peito: OFF"
-    throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
-end)
-
-rejoinButton.MouseButton1Click:Connect(function()
-    rejoinButton.Text = "Reconectando..."
-    rejoinButton.BackgroundColor3 = Color3.fromRGB(150, 100, 50)
-    saveStateAndTeleport(function()
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-    end)
-end)
-
-returnButton.MouseButton1Click:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root and preTeleportPos then
-        root.CFrame = preTeleportPos
-    end
-end)
-
-local lastPos = nil
+-- Reforço no Heartbeat para garantir a aderência contínua
 RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        if lastPos then
-            local dist = (root.Position - lastPos).Magnitude
-            if dist > 40 then
-                preTeleportPos = CFrame.new(lastPos)
-            end
+    if not guardActive then return end
+
+    local targetPlayer = getTargetPlayer()
+    if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+        local targetChar = targetPlayer.Character
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+        if targetRoot and myRoot then
+            pcall(function()
+                targetRoot.AssemblyLinearVelocity = Vector3.zero
+                targetRoot.AssemblyAngularVelocity = Vector3.zero
+                myRoot.CFrame = targetRoot.CFrame
+            end)
         end
-        lastPos = root.Position
     end
 end)
-
-local function getTargetPlayer()
-    local query = targetBox.Text:lower()
-    if query == "" then return nil end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local pName, pDisp = player.Name:lower(), player.DisplayName:lower()
-            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
-                return player
-            end
-        end
-    end
-    return nil
-end
-
-local function isValidTarget(targetChar)
-    if not targetChar then return false end
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-    return targetRoot ~= nil
-end
 
 -- AUTO-REJOIN SEGURO
 task.spawn(function()
