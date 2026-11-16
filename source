@@ -801,7 +801,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- PERSEGUIÇÃO DO TORNADO DE PEITO (Cola você nos jogadores seguindo a regra de "Todos" ou Alvo)
+-- PERSEGUIÇÃO DO TORNADO DE PEITO (Agora prioriza o mais próximo e fica 1.5s na pessoa)
 task.spawn(function()
     while true do
         if not throwPartsActive or flingActive then
@@ -817,21 +817,32 @@ task.spawn(function()
         end
 
         if todosActive then
-            local validPlayers = {}
+            local validTargets = {}
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
-                    table.insert(validPlayers, p.Character)
+                    local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                    if targetRoot then
+                        local dist = (myRoot.Position - targetRoot.Position).Magnitude
+                        table.insert(validTargets, {char = p.Character, root = targetRoot, dist = dist})
+                    end
                 end
             end
 
-            if #validPlayers > 0 then
-                for _, targetChar in ipairs(validPlayers) do
+            -- Ordena do mais perto para o mais longe
+            table.sort(validTargets, function(a, b)
+                return a.dist < b.dist
+            end)
+
+            if #validTargets > 0 then
+                for _, targetData in ipairs(validTargets) do
                     if not throwPartsActive or not todosActive or flingActive then break end
-                    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                    local targetChar = targetData.char
+                    local targetRoot = targetData.root
+                    
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        -- Fica colado no alvo por 0.55s para os blocos do peito atingirem e lançarem ele
-                        while throwPartsActive and todosActive and not flingActive and isValidTarget(targetChar) and (tick() - startTick < 0.55) do
+                        -- Fica colado no alvo mais próximo por 1.5s antes de reavaliar
+                        while throwPartsActive and todosActive and not flingActive and isValidTarget(targetChar) and (tick() - startTick < 1.5) do
                             myChar = LocalPlayer.Character
                             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                             if not myRoot then break end
@@ -841,7 +852,7 @@ task.spawn(function()
                     end
                 end
             else
-                task.wait(0.2)
+                task.wait(0.3)
             end
         else
             local targetPlayer = getTargetPlayer()
@@ -858,13 +869,13 @@ task.spawn(function()
                     end
                 end
             else
-                task.wait(0.2)
+                task.wait(0.3)
             end
         end
     end
 end)
 
--- Loop Fling Dinâmico (Comutável: Normal vs Luta de Script)
+-- Loop Fling Dinâmico (Agora prioriza o mais próximo e fica 1.2s na pessoa)
 task.spawn(function()
     while true do
         if not flingActive then
@@ -896,31 +907,43 @@ task.spawn(function()
                 rootPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
             else
                 local randomOffset = CFrame.new(
-                    math.random(-80, 80) / 100, 
-                    math.random(-20, 20) / 100, 
-                    math.random(-80, 80) / 100
+                    math.random(-100, 100) / 100, 
+                    math.random(-50, 50) / 100, 
+                    math.random(-100, 100) / 100
                 )
                 rootPart.CFrame = targetRoot.CFrame * randomOffset
-                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-20000, 20000), -50000, math.random(-20000, 20000))
-                rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-30000, 30000), math.random(30000, 50000), math.random(-30000, 30000))
+                rootPart.AssemblyAngularVelocity = Vector3.new(999999, 999999, 999999)
             end
         end
 
         if todosActive then
-            local targets = {}
+            local validTargets = {}
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character and isValidTarget(player.Character) then
-                    table.insert(targets, player.Character)
+                    local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                    if targetRoot then
+                        local dist = (rootPart.Position - targetRoot.Position).Magnitude
+                        table.insert(validTargets, {char = player.Character, root = targetRoot, dist = dist})
+                    end
                 end
             end
 
-            if #targets > 0 then
-                for _, targetChar in ipairs(targets) do
+            -- Ordena do mais perto para o mais longe
+            table.sort(validTargets, function(a, b)
+                return a.dist < b.dist
+            end)
+
+            if #validTargets > 0 then
+                for _, targetData in ipairs(validTargets) do
                     if not flingActive or not todosActive then break end
-                    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                    local targetChar = targetData.char
+                    local targetRoot = targetData.root
+                    
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        local duration = scriptFightActive and 0.4 or 0.35
+                        -- Aumentado para 1.2s para ficar mais tempo na mesma pessoa
+                        local duration = 1.2
                         while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < duration) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
