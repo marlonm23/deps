@@ -533,8 +533,20 @@ antiFlingButton.MouseButton1Click:Connect(function()
     antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
+-- SISTEMA DE GERENCIAMENTO DE COLISÃO DA PROTEÇÃO
+local guardConstraints = {}
+local function clearGuardConstraints()
+    for _, nc in ipairs(guardConstraints) do
+        pcall(function() nc:Destroy() end)
+    end
+    table.clear(guardConstraints)
+end
+
 guardButton.MouseButton1Click:Connect(function()
     guardActive = not guardActive
+    if not guardActive then
+        clearGuardConstraints()
+    end
     guardButton.Text = guardActive and "Proteção: ON" or "Proteção: OFF"
     guardButton.BackgroundColor3 = guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
@@ -610,9 +622,16 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
--- SISTEMA DE PROTEÇÃO TOTAL: Cola no alvo e absorve/anula qualquer tentativa de Fling nele, transferindo para você
-RunService.Heartbeat:Connect(function()
-    if not guardActive then return end
+-- SISTEMA DE PROTEÇÃO NO STEPPED (Roda antes do motor de física para neutralizar o fling do alvo nos outros)
+local lastGuardedChar = nil
+RunService.Stepped:Connect(function()
+    if not guardActive then
+        if #guardConstraints > 0 then
+            clearGuardConstraints()
+            lastGuardedChar = nil
+        end
+        return
+    end
 
     local targetPlayer = getTargetPlayer()
     if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
@@ -621,25 +640,76 @@ RunService.Heartbeat:Connect(function()
         
         local myChar = LocalPlayer.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
+
+        if targetRoot and myRoot then
+            -- Se mudou o personagem protegido, recria as travas de colisão
+            if lastGuardedChar ~= targetChar then
+                clearGuardConstraints()
+                lastGuardedChar = targetChar
+            end
+
+            pcall(function()
+                -- 1. Desativa colisão física de TODAS as partes do alvo (script) e zera massa/atrito dele
+                for _, part in ipairs(targetChar:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                        part.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
+                        part.AssemblyLinearVelocity = Vector3.zero
+                        part.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end
+
+                -- 2. Cria NoCollisionConstraint entre o script e TODOS os outros jogadores (exceto você)
+                if #guardConstraints == 0 then
+                    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                        if otherPlayer ~= LocalPlayer and otherPlayer ~= targetPlayer and otherPlayer.Character then
+                            for _, tPart in ipairs(targetChar:GetDescendants()) do
+                                if tPart:IsA("BasePart") then
+                                    for _, oPart in ipairs(otherPlayer.Character:GetDescendants()) do
+                                        if oPart:IsA("BasePart") then
+                                            local nc = Instance.new("NoCollisionConstraint")
+                                            nc.Part0 = tPart
+                                            nc.Part1 = oPart
+                                            nc.Parent = tPart
+                                            table.insert(guardConstraints, nc)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                -- 3. Cola você no alvo para absorver o impacto no lugar dos outros
+                myRoot.CFrame = targetRoot.CFrame
+                myRoot.CanCollide = true
+                myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
+            end)
+        end
+    else
+        if #guardConstraints > 0 then
+            clearGuardConstraints()
+            lastGuardedChar = nil
+        end
+    end
+end)
+
+-- Reforço adicional no Heartbeat para manter colado e zerar velocidade pós-física
+RunService.Heartbeat:Connect(function()
+    if not guardActive then return end
+
+    local targetPlayer = getTargetPlayer()
+    if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+        local targetChar = targetPlayer.Character
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
         if targetRoot and myRoot then
             pcall(function()
-                -- Zera totalmente qualquer velocidade que o alvo tentasse receber de fling externo
                 targetRoot.AssemblyLinearVelocity = Vector3.zero
                 targetRoot.AssemblyAngularVelocity = Vector3.zero
-                
-                -- Cola você exatamente na posição dele para absorver o impacto e o dano/fling em seu lugar
                 myRoot.CFrame = targetRoot.CFrame
-
-                -- Garante que o seu próprio personagem tenha física alta para absorver a batida
-                myRoot.CanCollide = true
-                myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
-
-                -- Se você tomar dano devido ao impacto redirecionado, o script gerencia a sua saúde sem afetar o protegido
-                if myHumanoid and myHumanoid.Health <= 0 then
-                    -- Mantém você pronto caso precise
-                end
             end)
         end
     end
