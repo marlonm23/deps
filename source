@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Jogar Blocos Automáticos + Inimigos JSON + Anti-Fling + Auto-Rejoin + Server Teleport
+    Script: Mass Walkfling + Tornado de Blocos em Volta de Mim + Proteção Total + Inimigos JSON + Server Teleport
 --]]
 
 local Players = game:GetService("Players")
@@ -14,7 +14,7 @@ local savedConfig = _G.MassFlingConfig or {
     flingActive = false,
     scriptFightActive = false,
     todosActive = false,
-    antiFlingActive = false,
+    antiFlingActive = true,
     invisibleActive = false,
     throwPartsActive = false,
     targetText = ""
@@ -28,6 +28,7 @@ local invisibleActive = savedConfig.invisibleActive
 local throwPartsActive = savedConfig.throwPartsActive
 
 local preTeleportPos = nil
+local lastSafeCFrame = nil
 local scriptUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source"
 local jsonUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/id"
 
@@ -68,7 +69,7 @@ screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
--- Janela Principal (Posicionada à esquerda da tela por padrão)
+-- Janela Principal (Posicionada à esquerda da tela)
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 420)
 mainFrame.Position = UDim2.new(0, 20, 0, 50)
@@ -104,7 +105,7 @@ titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.Text = "⚡ Hub Inimigos & Tracker"
 titleLabel.Parent = topBar
 
--- Sistema de Abas Profissional (3 Abas)
+-- Sistema de Abas (3 Abas)
 local tabContainer = Instance.new("Frame")
 tabContainer.Size = UDim2.new(1, -16, 0, 30)
 tabContainer.Position = UDim2.new(0, 8, 0, 40)
@@ -216,7 +217,7 @@ end
 local flingButton = createButton(tab1Content, flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO", 0, flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local scriptFightButton = createButton(tab1Content, scriptFightActive and "Luta de Script: ON" or "Luta de Script: OFF", 36, scriptFightActive and Color3.fromRGB(180, 120, 40) or Color3.fromRGB(60, 60, 70))
 local todosButton = createButton(tab1Content, todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO", 72, todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local antiFlingButton = createButton(tab1Content, antiFlingActive and "Anti-Fling: ON" or "Anti-Fling: OFF", 108, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local antiFlingButton = createButton(tab1Content, antiFlingActive and "Proteção Total: ON" or "Proteção Total: OFF", 108, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local invisibleButton = createButton(tab1Content, invisibleActive and "Invisível: ON" or "Invisível: OFF", 144, invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 
 local targetBox = Instance.new("TextBox")
@@ -237,7 +238,7 @@ targetBox:GetPropertyChangedSignal("Text"):Connect(function()
     savedConfig.targetText = targetBox.Text
 end)
 
-local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local throwPartsButton = createButton(tab1Content, throwPartsActive and "Tornado Blocos: ON" or "Tornado Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 252, Color3.fromRGB(90, 60, 180))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 288, Color3.fromRGB(40, 130, 90))
 
@@ -524,7 +525,7 @@ end)
 
 antiFlingButton.MouseButton1Click:Connect(function()
     antiFlingActive = not antiFlingActive
-    antiFlingButton.Text = antiFlingActive and "Anti-Fling: ON" or "Anti-Fling: OFF"
+    antiFlingButton.Text = antiFlingActive and "Proteção Total: ON" or "Proteção Total: OFF"
     antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
@@ -544,7 +545,7 @@ end)
 
 throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsActive = not throwPartsActive
-    throwPartsButton.Text = throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF"
+    throwPartsButton.Text = throwPartsActive and "Tornado Blocos: ON" or "Tornado Blocos: OFF"
     throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
@@ -648,7 +649,7 @@ task.spawn(function()
     end
 end)
 
--- ANTI-FLING
+-- REDE DE SIMULAÇÃO MÁXIMA
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
         pcall(function()
@@ -657,96 +658,150 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- PROTEÇÃO TOTAL (Anti-Fling + Anti-Void + Imunidade a Dano/Queda)
 RunService.Stepped:Connect(function()
     if not antiFlingActive then return end
     
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if root and (root.AssemblyLinearVelocity.Magnitude > 300 or root.AssemblyAngularVelocity.Magnitude > 300) then
-        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+    if humanoid then
+        -- Impede morrer por estado de queda/ragdoll ou dano comum do cliente
+        pcall(function()
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+            if humanoid.Health < humanoid.MaxHealth and humanoid.Health > 0 then
+                humanoid.Health = humanoid.MaxHealth
+            end
+        end)
     end
 
+    if root then
+        -- Salva última posição firme acima do void
+        if root.Position.Y > -30 and root.AssemblyLinearVelocity.Magnitude < 120 then
+            lastSafeCFrame = root.CFrame
+        end
+
+        -- Se for jogado para fora do mapa / void, puxa instantaneamente de volta
+        if root.Position.Y < -50 and lastSafeCFrame then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+            root.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
+        end
+
+        -- Bloqueia qualquer impacto de fling no seu próprio boneco
+        if not flingActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+
+    -- Neutraliza velocidades absurdas de outros jogadores perto de você
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local otherRoot = player.Character:FindFirstChild("HumanoidRootPart")
             if otherRoot and (otherRoot.AssemblyLinearVelocity.Magnitude > 250 or otherRoot.AssemblyAngularVelocity.Magnitude > 250) then
                 pcall(function()
-                    otherRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    otherRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                    otherRoot.AssemblyLinearVelocity = Vector3.zero
+                    otherRoot.AssemblyAngularVelocity = Vector3.zero
                 end)
             end
         end
     end
 end)
 
--- Loop Automático Inteligente: Descobre e Arremessa QUALQUER Bloco Dinâmico Próximo na Direção do Alvo
-task.spawn(function()
-    while true do
-        if not throwPartsActive then
-            task.wait(0.2)
-            continue
-        end
+-- TORNADO DE BLOCOS EM VOLTA DE VOCÊ (Sem te acertar!)
+local activeOrbitParts = {}
 
-        local targetChar = nil
-        if todosActive then
-            local validPlayers = {}
+RunService.Heartbeat:Connect(function()
+    if not throwPartsActive then
+        if #activeOrbitParts > 0 then
+            for _, data in ipairs(activeOrbitParts) do
+                if data.noCollide then pcall(function() data.noCollide:Destroy() end) end
+            end
+            table.clear(activeOrbitParts)
+        end
+        return
+    end
+
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    -- Descobre blocos soltos num raio de 180 studs ao seu redor
+    for _, part in ipairs(Workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Anchored and not part.Locked then
+            local isCharPart = false
             for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
-                    table.insert(validPlayers, p.Character)
+                if p.Character and part:IsDescendantOf(p.Character) then
+                    isCharPart = true
+                    break
                 end
             end
-            if #validPlayers > 0 then
-                targetChar = validPlayers[math.random(1, #validPlayers)]
+
+            if not isCharPart and (part.Position - myRoot.Position).Magnitude < 180 then
+                local alreadyTracked = false
+                for _, item in ipairs(activeOrbitParts) do
+                    if item.part == part then
+                        alreadyTracked = true
+                        break
+                    end
+                end
+
+                if not alreadyTracked and #activeOrbitParts < 45 then
+                    -- Cria NoCollisionConstraint entre o bloco e o seu boneco para você não levar dano/empurrão
+                    local nc = Instance.new("NoCollisionConstraint")
+                    nc.Part0 = part
+                    nc.Part1 = myRoot
+                    nc.Parent = part
+
+                    table.insert(activeOrbitParts, {
+                        part = part,
+                        noCollide = nc,
+                        angleOffset = math.random() * math.pi * 2,
+                        heightOffset = math.random(-2, 4)
+                    })
+                end
             end
+        end
+    end
+
+    -- Faz todos os blocos capturados girarem como uma serra elétrica em volta de você
+    local t = tick() * 18 -- Velocidade de rotação altíssima
+    for i = #activeOrbitParts, 1, -1 do
+        local data = activeOrbitParts[i]
+        local part = data.part
+
+        if not part or not part.Parent or part.Anchored then
+            if data.noCollide then pcall(function() data.noCollide:Destroy() end) end
+            table.remove(activeOrbitParts, i)
         else
-            local targetPlayer = getTargetPlayer()
-            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
-                targetChar = targetPlayer.Character
-            end
-        end
+            pcall(function()
+                part.CanCollide = true
+                part.CustomPhysicalProperties = PhysicalProperties.new(100, 2, 2, 2, 2)
 
-        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-            local targetRoot = targetChar.HumanoidRootPart
-            local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            
-            -- Varre automaticamente todas as partes físicas do Workspace sem precisar restringir a cor preta
-            for _, part in ipairs(Workspace:GetDescendants()) do
-                if not throwPartsActive then break end
-                
-                if part:IsA("BasePart") and not part.Anchored and not part.Locked then
-                    -- Ignora partes do próprio jogador ou de outros players
-                    local isCharacterPart = false
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p.Character and part:IsDescendantOf(p.Character) then
-                            isCharacterPart = true
-                            break
-                        end
-                    end
+                -- Raio curto (5 studs) para acertar quem estiver colado em você
+                local radius = 5.5
+                local currentAngle = t + data.angleOffset
+                local targetPos = myRoot.Position + Vector3.new(
+                    math.cos(currentAngle) * radius,
+                    data.heightOffset,
+                    math.sin(currentAngle) * radius
+                )
 
-                    if not isCharacterPart then
-                        -- Verifica se o bloco está relativamente perto para ser controlado
-                        local distToTarget = (part.Position - targetRoot.Position).Magnitude
-                        if distToTarget < 150 then
-                            pcall(function()
-                                part.CanCollide = true
-                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 2, 2, 2, 2)
-                                
-                                -- Dispara o bloco automaticamente direto na cabeça/corpo do alvo com força absoluta
-                                local direction = (targetRoot.Position - part.Position).Unit
-                                part.AssemblyLinearVelocity = direction * 600 + Vector3.new(0, 150, 0)
-                                part.AssemblyAngularVelocity = Vector3.new(8000, 8000, 8000)
-                            end)
-                        end
-                    end
-                end
-            end
+                -- Vetor tangencial + puxão para a órbita = giro violento contínuo
+                local toOrbit = (targetPos - part.Position)
+                local tangent = Vector3.new(-math.sin(currentAngle), 0, math.cos(currentAngle)) * 220
+
+                part.AssemblyLinearVelocity = (toOrbit * 35) + tangent
+                part.AssemblyAngularVelocity = Vector3.new(9999, 9999, 9999)
+            end)
         end
-        task.wait(0.02)
     end
 end)
 
--- Loop Fling Dinâmico (Anti-Anti-Fling Extremo para Luta de Script)
+-- Loop Fling Dinâmico (Comutável: Normal vs Luta de Script)
 task.spawn(function()
     while true do
         if not flingActive then
@@ -773,12 +828,10 @@ task.spawn(function()
             end)
 
             if scriptFightActive then
-                -- MODO LUTA DE SCRIPT EXTREMO: Força o personagem a atravessar colisão com velocidade estourada para cima e para fora
                 rootPart.CFrame = targetRoot.CFrame + Vector3.new(0, 1, 0)
                 rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-99999, 99999), 85000, math.random(-99999, 99999))
                 rootPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
             else
-                -- MODO FLING NORMAL: Afunda para baixo direto no void
                 local randomOffset = CFrame.new(
                     math.random(-80, 80) / 100, 
                     math.random(-20, 20) / 100, 
@@ -822,7 +875,6 @@ task.spawn(function()
             local targetPlayer = getTargetPlayer()
             if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
                 local targetChar = targetPlayer.Character
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootColor" or "HumanoidRootPart") -- mantido seguro
                 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot then
@@ -831,7 +883,6 @@ task.spawn(function()
                         rootPart = character and character:FindFirstChild("HumanoidRootPart")
                         if not character or not rootPart then break end
                         
-                        applyFlipped = true -- dummy
                         applyFlingForce(targetRoot)
                         RunService.Heartbeat:Wait()
                     end
