@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Tornado Centralizado + Perseguição Automática de Alvos + Proteção Total
+    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Total
 --]]
 
 local Players = game:GetService("Players")
@@ -69,7 +69,7 @@ screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
--- Janela Principal (Posicionada à esquerda da tela)
+-- Janela Principal
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 420)
 mainFrame.Position = UDim2.new(0, 20, 0, 50)
@@ -226,7 +226,7 @@ targetBox.Position = UDim2.new(0, 0, 0, 180)
 targetBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
-targetBox.PlaceholderText = "Nome do Alvo..."
+targetBox.PlaceholderText = "Nome do Alvo (ou parte do nome)..."
 targetBox.Text = savedConfig.targetText or ""
 targetBox.TextSize = 12
 targetBox.Font = Enum.Font.SourceSans
@@ -238,7 +238,7 @@ targetBox:GetPropertyChangedSignal("Text"):Connect(function()
     savedConfig.targetText = targetBox.Text
 end)
 
-local throwPartsButton = createButton(tab1Content, throwPartsActive and "Tornado Blocos: ON" or "Tornado Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local throwPartsButton = createButton(tab1Content, throwPartsActive and "Blocos no Peito: ON" or "Blocos no Peito: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 252, Color3.fromRGB(90, 60, 180))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 288, Color3.fromRGB(40, 130, 90))
 
@@ -545,7 +545,7 @@ end)
 
 throwPartsButton.MouseButton1Click:Connect(function()
     throwPartsActive = not throwPartsActive
-    throwPartsButton.Text = throwPartsActive and "Tornado Blocos: ON" or "Tornado Blocos: OFF"
+    throwPartsButton.Text = throwPartsActive and "Blocos no Peito: ON" or "Blocos no Peito: OFF"
     throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
@@ -706,51 +706,33 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- TORNADO CENTRALIZADO EM VOCÊ + PERSEGUIÇÃO AUTOMÁTICA DE ALVOS (Respeitando "Todos" ou Alvo Específico)
+-- NÚCLEO DE BLOCOS CENTRALIZADO NO PEITO DO PERSONAGEM
 local activeOrbitParts = {}
+
+local function clearOrbitParts()
+    for _, data in ipairs(activeOrbitParts) do
+        if data.constraints then
+            for _, nc in ipairs(data.constraints) do
+                pcall(function() nc:Destroy() end)
+            end
+        end
+    end
+    table.clear(activeOrbitParts)
+end
 
 RunService.Heartbeat:Connect(function()
     if not throwPartsActive then
         if #activeOrbitParts > 0 then
-            for _, data in ipairs(activeOrbitParts) do
-                if data.noCollide then pcall(function() data.noCollide:Destroy() end) end
-            end
-            table.clear(activeOrbitParts)
+            clearOrbitParts()
         end
         return
     end
 
     local myChar = LocalPlayer.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
+    local chestPart = myChar and (myChar:FindFirstChild("UpperTorso") or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("HumanoidRootPart"))
+    if not chestPart then return end
 
-    -- Sistema de Perseguição Automática (Teleporta você até o alvo / todos)
-    pcall(function()
-        local targetChar = nil
-        if todosActive then
-            local validPlayers = {}
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
-                    table.insert(validPlayers, p.Character)
-                end
-            end
-            if #validPlayers > 0 then
-                targetChar = validPlayers[math.random(1, #validPlayers)]
-            end
-        else
-            local targetPlayer = getTargetPlayer()
-            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
-                targetChar = targetPlayer.Character
-            end
-        end
-
-        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-            -- Cola exatamente em cima do jogador alvo para o tornado atingi-lo
-            myRoot.CFrame = targetChar.HumanoidRootPart.CFrame
-        end
-    end)
-
-    -- Captura blocos num raio gigante de 400 studs do mapa
+    -- Captura blocos soltos num raio de 400 studs
     for _, part in ipairs(Workspace:GetDescendants()) do
         if part:IsA("BasePart") and not part.Anchored and not part.Locked then
             local isCharPart = false
@@ -761,7 +743,7 @@ RunService.Heartbeat:Connect(function()
                 end
             end
 
-            if not isCharPart and (part.Position - myRoot.Position).Magnitude < 400 then
+            if not isCharPart and (part.Position - chestPart.Position).Magnitude < 400 then
                 local alreadyTracked = false
                 for _, item in ipairs(activeOrbitParts) do
                     if item.part == part then
@@ -770,51 +752,114 @@ RunService.Heartbeat:Connect(function()
                     end
                 end
 
-                if not alreadyTracked and #activeOrbitParts < 70 then
-                    local nc = Instance.new("NoCollisionConstraint")
-                    nc.Part0 = part
-                    nc.Part1 = myRoot
-                    nc.Parent = part
+                if not alreadyTracked and #activeOrbitParts < 80 then
+                    -- Bloqueia colisão do bloco com TODAS as partes do seu próprio boneco
+                    local constraints = {}
+                    for _, myPart in ipairs(myChar:GetDescendants()) do
+                        if myPart:IsA("BasePart") then
+                            local nc = Instance.new("NoCollisionConstraint")
+                            nc.Part0 = part
+                            nc.Part1 = myPart
+                            nc.Parent = part
+                            table.insert(constraints, nc)
+                        end
+                    end
 
                     table.insert(activeOrbitParts, {
                         part = part,
-                        noCollide = nc,
-                        angleOffset = math.random() * math.pi * 2,
-                        heightOffset = math.random(-2, 5)
+                        constraints = constraints
                     })
                 end
             end
         end
     end
 
-    -- Gira o tornado estritamente em volta de VOCÊ
-    local t = tick() * 25
+    -- Centraliza TODOS os blocos exatamente no centro do seu peito girando no próprio eixo
+    local chestPos = chestPart.Position
     for i = #activeOrbitParts, 1, -1 do
         local data = activeOrbitParts[i]
         local part = data.part
 
         if not part or not part.Parent or part.Anchored then
-            if data.noCollide then pcall(function() data.noCollide:Destroy() end) end
+            if data.constraints then
+                for _, nc in ipairs(data.constraints) do
+                    pcall(function() nc:Destroy() end)
+                end
+            end
             table.remove(activeOrbitParts, i)
         else
             pcall(function()
                 part.CanCollide = true
                 part.CustomPhysicalProperties = PhysicalProperties.new(100, 2, 2, 2, 2)
 
-                local radius = 5.0 -- Raio bem fechado em volta de você
-                local currentAngle = t + data.angleOffset
-                local targetPos = myRoot.Position + Vector3.new(
-                    math.cos(currentAngle) * radius,
-                    data.heightOffset,
-                    math.sin(currentAngle) * radius
-                )
-
-                local toOrbit = (targetPos - part.Position)
-                local tangent = Vector3.new(-math.sin(currentAngle), 0, math.cos(currentAngle)) * 350
-
-                part.AssemblyLinearVelocity = (toOrbit * 60) + tangent
-                part.AssemblyAngularVelocity = Vector3.new(9999, 9999, 9999)
+                -- Puxa direto para o centro do peito (raio zero)
+                local toChest = (chestPos - part.Position)
+                part.AssemblyLinearVelocity = toChest * 85
+                part.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
             end)
+        end
+    end
+end)
+
+-- PERSEGUIÇÃO DO TORNADO DE PEITO (Cola você nos jogadores seguindo a regra de "Todos" ou Alvo)
+task.spawn(function()
+    while true do
+        if not throwPartsActive or flingActive then
+            task.wait(0.15)
+            continue
+        end
+
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot then
+            task.wait(0.3)
+            continue
+        end
+
+        if todosActive then
+            local validPlayers = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
+                    table.insert(validPlayers, p.Character)
+                end
+            end
+
+            if #validPlayers > 0 then
+                for _, targetChar in ipairs(validPlayers) do
+                    if not throwPartsActive or not todosActive or flingActive then break end
+                    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                    if targetRoot and isValidTarget(targetChar) then
+                        local startTick = tick()
+                        -- Fica colado no alvo por 0.55s para os blocos do peito atingirem e lançarem ele
+                        while throwPartsActive and todosActive and not flingActive and isValidTarget(targetChar) and (tick() - startTick < 0.55) do
+                            myChar = LocalPlayer.Character
+                            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                            if not myRoot then break end
+                            myRoot.CFrame = targetRoot.CFrame
+                            RunService.Heartbeat:Wait()
+                        end
+                    end
+                end
+            else
+                task.wait(0.2)
+            end
+        else
+            local targetPlayer = getTargetPlayer()
+            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+                local targetChar = targetPlayer.Character
+                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                if targetRoot then
+                    while throwPartsActive and not todosActive and not flingActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                        myChar = LocalPlayer.Character
+                        myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                        if not myRoot then break end
+                        myRoot.CFrame = targetRoot.CFrame
+                        RunService.Heartbeat:Wait()
+                    end
+                end
+            else
+                task.wait(0.2)
+            end
         end
     end
 end)
@@ -831,7 +876,7 @@ task.spawn(function()
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
-        if not rootPart || not humanoid || humanoid.Health <= 0 then
+        if not rootPart or not humanoid or humanoid.Health <= 0 then
             task.wait(0.5)
             continue
         end
