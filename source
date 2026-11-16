@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Absoluta
+    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Absoluta (Otimizada)
 --]]
 
 local Players = game:GetService("Players")
@@ -629,9 +629,9 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
--- SISTEMA DE PROTEÇÃO TOTAL ANTI-FLING E ISOLAMENTO DE COLISÃO
+-- SISTEMA DE PROTEÇÃO TOTAL OTIMIZADO (RenderStepped para Teletransporte instantâneo e sem atraso)
 local lastGuardedChar = nil
-RunService.Stepped:Connect(function()
+RunService.RenderStepped:Connect(function()
     if not guardActive then
         if #guardConstraints > 0 then
             clearGuardConstraints()
@@ -656,16 +656,16 @@ RunService.Stepped:Connect(function()
             end
 
             pcall(function()
-                -- Congela a movimentação autônoma do alvo protegido para que ele não ande até os outros
+                -- Congela a movimentação autônoma do alvo protegido para que ele não ande
                 if targetHumanoid then
                     targetHumanoid.PlatformStand = true
                 end
 
-                -- Zera impulsos de fling no alvo
+                -- Zera imediatamente qualquer impulso físico no alvo
                 targetRoot.AssemblyLinearVelocity = Vector3.zero
                 targetRoot.AssemblyAngularVelocity = Vector3.zero
 
-                -- CRIA NoCollisionConstraint entre o alvo protegido e TODOS OS OUTROS PLAYERS DO SERVIDOR (exceto você)
+                -- Cria NoCollisionConstraint entre o alvo e todos os outros jogadores (exceto você)
                 if #guardConstraints == 0 then
                     for _, otherPlayer in ipairs(Players:GetPlayers()) do
                         if otherPlayer ~= LocalPlayer and otherPlayer ~= targetPlayer and otherPlayer.Character then
@@ -686,8 +686,10 @@ RunService.Stepped:Connect(function()
                     end
                 end
 
-                -- Mantém você rigorosamente colado nele para absorver qualquer dano/impacto
+                -- Teletransporte instantâneo e colado milimetricamente no alvo
                 myRoot.CFrame = targetRoot.CFrame
+                myRoot.AssemblyLinearVelocity = Vector3.zero
+                myRoot.AssemblyAngularVelocity = Vector3.zero
                 myRoot.CanCollide = true
                 myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
             end)
@@ -696,27 +698,6 @@ RunService.Stepped:Connect(function()
         if #guardConstraints > 0 then
             clearGuardConstraints()
             lastGuardedChar = nil
-        end
-    end
-end)
-
--- Reforço no Heartbeat para garantir a aderência contínua
-RunService.Heartbeat:Connect(function()
-    if not guardActive then return end
-
-    local targetPlayer = getTargetPlayer()
-    if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
-        local targetChar = targetPlayer.Character
-        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-        local myChar = LocalPlayer.Character
-        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-        if targetRoot and myRoot then
-            pcall(function()
-                targetRoot.AssemblyLinearVelocity = Vector3.zero
-                targetRoot.AssemblyAngularVelocity = Vector3.zero
-                myRoot.CFrame = targetRoot.CFrame
-            end)
         end
     end
 end)
@@ -853,7 +834,6 @@ RunService.Heartbeat:Connect(function()
     local chestPart = myChar and (myChar:FindFirstChild("UpperTorso") or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("HumanoidRootPart"))
     if not chestPart then return end
 
-    -- Captura blocos soltos num raio de 400 studs
     for _, part in ipairs(Workspace:GetDescendants()) do
         if part:IsA("BasePart") and not part.Anchored and not part.Locked then
             local isCharPart = false
@@ -874,7 +854,6 @@ RunService.Heartbeat:Connect(function()
                 end
 
                 if not alreadyTracked and #activeOrbitParts < 80 then
-                    -- Bloqueia colisão do bloco com TODAS as partes do seu próprio boneco
                     local constraints = {}
                     for _, myPart in ipairs(myChar:GetDescendants()) do
                         if myPart:IsA("BasePart") then
@@ -895,7 +874,6 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Centraliza TODOS os blocos exatamente no centro do seu peito girando no próprio eixo
     local chestPos = chestPart.Position
     for i = #activeOrbitParts, 1, -1 do
         local data = activeOrbitParts[i]
@@ -913,7 +891,6 @@ RunService.Heartbeat:Connect(function()
                 part.CanCollide = true
                 part.CustomPhysicalProperties = PhysicalProperties.new(100, 2, 2, 2, 2)
 
-                -- Puxa direto para o centro do peito (raio zero)
                 local toChest = (chestPos - part.Position)
                 part.AssemblyLinearVelocity = toChest * 85
                 part.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
@@ -922,7 +899,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- PERSEGUIÇÃO DO TORNADO DE PEITO (Prioriza o mais perto e fica 1.5s na pessoa)
+-- PERSEGUIÇÃO DO TORNADO DE PEITO
 task.spawn(function()
     while true do
         if not throwPartsActive or flingActive or guardActive then
@@ -994,7 +971,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Dinâmico (Prioriza o mais perto e fica 1.2s na pessoa)
+-- Loop Fling Dinâmico
 task.spawn(function()
     while true do
         if not flingActive or guardActive then
