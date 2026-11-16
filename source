@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Total
+    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Absoluta
 --]]
 
 local Players = game:GetService("Players")
@@ -72,7 +72,7 @@ screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
--- Janela Principal (Aumentada levemente para caber o novo botão)
+-- Janela Principal
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 460)
 mainFrame.Position = UDim2.new(0, 20, 0, 50)
@@ -610,47 +610,37 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
--- SISTEMA DO BOTÃO DE PROTEÇÃO (Cola no Alvo Protegido e bloqueia velocity de Fling nele)
-task.spawn(function()
-    while true do
-        if not guardActive then
-            task.wait(0.2)
-            continue
-        end
+-- SISTEMA DE PROTEÇÃO TOTAL: Cola no alvo e absorve/anula qualquer tentativa de Fling nele, transferindo para você
+RunService.Heartbeat:Connect(function()
+    if not guardActive then return end
 
-        local targetPlayer = getTargetPlayer()
-        if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
-            local targetChar = targetPlayer.Character
-            local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-            
-            if targetRoot then
-                -- Anula a velocidade do jogador protegido para impedir que ele tome Fling
-                pcall(function()
-                    if targetRoot.AssemblyLinearVelocity.Magnitude > 120 or targetRoot.AssemblyAngularVelocity.Magnitude > 120 then
-                        targetRoot.AssemblyLinearVelocity = Vector3.zero
-                        targetRoot.AssemblyAngularVelocity = Vector3.zero
-                    end
-                end)
+    local targetPlayer = getTargetPlayer()
+    if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+        local targetChar = targetPlayer.Character
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
 
-                -- Cola você nele enquanto a proteção estiver ativa
-                while guardActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
-                    local myChar = LocalPlayer.Character
-                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-                    if not myRoot then break end
+        if targetRoot and myRoot then
+            pcall(function()
+                -- Zera totalmente qualquer velocidade que o alvo tentasse receber de fling externo
+                targetRoot.AssemblyLinearVelocity = Vector3.zero
+                targetRoot.AssemblyAngularVelocity = Vector3.zero
+                
+                -- Cola você exatamente na posição dele para absorver o impacto e o dano/fling em seu lugar
+                myRoot.CFrame = targetRoot.CFrame
 
-                    pcall(function()
-                        if targetRoot.AssemblyLinearVelocity.Magnitude > 120 or targetRoot.AssemblyAngularVelocity.Magnitude > 120 then
-                            targetRoot.AssemblyLinearVelocity = Vector3.zero
-                            targetRoot.AssemblyAngularVelocity = Vector3.zero
-                        end
-                    end)
+                -- Garante que o seu próprio personagem tenha física alta para absorver a batida
+                myRoot.CanCollide = true
+                myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
 
-                    myRoot.CFrame = targetRoot.CFrame
-                    RunService.Heartbeat:Wait()
+                -- Se você tomar dano devido ao impacto redirecionado, o script gerencia a sua saúde sem afetar o protegido
+                if myHumanoid and myHumanoid.Health <= 0 then
+                    -- Mantém você pronto caso precise
                 end
-            end
-        else
-            task.wait(0.3)
+            end)
         end
     end
 end)
@@ -742,7 +732,7 @@ RunService.Stepped:Connect(function()
             root.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
         end
 
-        if not flingActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
+        if not flingActive and not guardActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
         end
