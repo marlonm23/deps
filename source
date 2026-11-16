@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Tornado de Blocos em Volta de Mim + Proteção Total + Inimigos JSON + Server Teleport
+    Script: Mass Walkfling + Tornado Centralizado + Perseguição Automática de Alvos + Proteção Total
 --]]
 
 local Players = game:GetService("Players")
@@ -653,7 +653,7 @@ end)
 RunService.Heartbeat:Connect(function()
     if throwPartsActive or flingActive then
         pcall(function()
-            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
+            sethiddenproperty(LocalPlayer, "SimulationRadius", 999999)
         end)
     end
 end)
@@ -667,7 +667,6 @@ RunService.Stepped:Connect(function()
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 
     if humanoid then
-        -- Impede morrer por estado de queda/ragdoll ou dano comum do cliente
         pcall(function()
             humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
@@ -678,26 +677,22 @@ RunService.Stepped:Connect(function()
     end
 
     if root then
-        -- Salva última posição firme acima do void
         if root.Position.Y > -30 and root.AssemblyLinearVelocity.Magnitude < 120 then
             lastSafeCFrame = root.CFrame
         end
 
-        -- Se for jogado para fora do mapa / void, puxa instantaneamente de volta
         if root.Position.Y < -50 and lastSafeCFrame then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
             root.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
         end
 
-        -- Bloqueia qualquer impacto de fling no seu próprio boneco
         if not flingActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
         end
     end
 
-    -- Neutraliza velocidades absurdas de outros jogadores perto de você
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local otherRoot = player.Character:FindFirstChild("HumanoidRootPart")
@@ -711,7 +706,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- TORNADO DE BLOCOS EM VOLTA DE VOCÊ (Sem te acertar!)
+-- TORNADO CENTRALIZADO EM VOCÊ + PERSEGUIÇÃO AUTOMÁTICA DE ALVOS (Respeitando "Todos" ou Alvo Específico)
 local activeOrbitParts = {}
 
 RunService.Heartbeat:Connect(function()
@@ -729,7 +724,33 @@ RunService.Heartbeat:Connect(function()
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myRoot then return end
 
-    -- Descobre blocos soltos num raio de 180 studs ao seu redor
+    -- Sistema de Perseguição Automática (Teleporta você até o alvo / todos)
+    pcall(function()
+        local targetChar = nil
+        if todosActive then
+            local validPlayers = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
+                    table.insert(validPlayers, p.Character)
+                end
+            end
+            if #validPlayers > 0 then
+                targetChar = validPlayers[math.random(1, #validPlayers)]
+            end
+        else
+            local targetPlayer = getTargetPlayer()
+            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+                targetChar = targetPlayer.Character
+            end
+        end
+
+        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+            -- Cola exatamente em cima do jogador alvo para o tornado atingi-lo
+            myRoot.CFrame = targetChar.HumanoidRootPart.CFrame
+        end
+    end)
+
+    -- Captura blocos num raio gigante de 400 studs do mapa
     for _, part in ipairs(Workspace:GetDescendants()) do
         if part:IsA("BasePart") and not part.Anchored and not part.Locked then
             local isCharPart = false
@@ -740,7 +761,7 @@ RunService.Heartbeat:Connect(function()
                 end
             end
 
-            if not isCharPart and (part.Position - myRoot.Position).Magnitude < 180 then
+            if not isCharPart and (part.Position - myRoot.Position).Magnitude < 400 then
                 local alreadyTracked = false
                 for _, item in ipairs(activeOrbitParts) do
                     if item.part == part then
@@ -749,8 +770,7 @@ RunService.Heartbeat:Connect(function()
                     end
                 end
 
-                if not alreadyTracked and #activeOrbitParts < 45 then
-                    -- Cria NoCollisionConstraint entre o bloco e o seu boneco para você não levar dano/empurrão
+                if not alreadyTracked and #activeOrbitParts < 70 then
                     local nc = Instance.new("NoCollisionConstraint")
                     nc.Part0 = part
                     nc.Part1 = myRoot
@@ -760,15 +780,15 @@ RunService.Heartbeat:Connect(function()
                         part = part,
                         noCollide = nc,
                         angleOffset = math.random() * math.pi * 2,
-                        heightOffset = math.random(-2, 4)
+                        heightOffset = math.random(-2, 5)
                     })
                 end
             end
         end
     end
 
-    -- Faz todos os blocos capturados girarem como uma serra elétrica em volta de você
-    local t = tick() * 18 -- Velocidade de rotação altíssima
+    -- Gira o tornado estritamente em volta de VOCÊ
+    local t = tick() * 25
     for i = #activeOrbitParts, 1, -1 do
         local data = activeOrbitParts[i]
         local part = data.part
@@ -781,8 +801,7 @@ RunService.Heartbeat:Connect(function()
                 part.CanCollide = true
                 part.CustomPhysicalProperties = PhysicalProperties.new(100, 2, 2, 2, 2)
 
-                -- Raio curto (5 studs) para acertar quem estiver colado em você
-                local radius = 5.5
+                local radius = 5.0 -- Raio bem fechado em volta de você
                 local currentAngle = t + data.angleOffset
                 local targetPos = myRoot.Position + Vector3.new(
                     math.cos(currentAngle) * radius,
@@ -790,11 +809,10 @@ RunService.Heartbeat:Connect(function()
                     math.sin(currentAngle) * radius
                 )
 
-                -- Vetor tangencial + puxão para a órbita = giro violento contínuo
                 local toOrbit = (targetPos - part.Position)
-                local tangent = Vector3.new(-math.sin(currentAngle), 0, math.cos(currentAngle)) * 220
+                local tangent = Vector3.new(-math.sin(currentAngle), 0, math.cos(currentAngle)) * 350
 
-                part.AssemblyLinearVelocity = (toOrbit * 35) + tangent
+                part.AssemblyLinearVelocity = (toOrbit * 60) + tangent
                 part.AssemblyAngularVelocity = Vector3.new(9999, 9999, 9999)
             end)
         end
@@ -813,7 +831,7 @@ task.spawn(function()
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
-        if not rootPart or not humanoid or humanoid.Health <= 0 then
+        if not rootPart || not humanoid || humanoid.Health <= 0 then
             task.wait(0.5)
             continue
         end
