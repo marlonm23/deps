@@ -743,7 +743,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Dinâmico (Comutável: Normal vs Luta de Script / Órbita Agressiva)
+-- Loop Fling Dinâmico (Anti-Anti-Fling Extremo para Luta de Script)
 task.spawn(function()
     while true do
         if not flingActive then
@@ -770,13 +770,9 @@ task.spawn(function()
             end)
 
             if scriptFightActive then
-                -- MODO LUTA DE SCRIPT: Órbita rápida em círculo + velocidade agressiva para lançar para fora do mapa
-                local angle = tick() * 50
-                local xOffset = math.cos(angle) * 3
-                local zOffset = math.sin(angle) * 3
-                
-                rootPart.CFrame = targetRoot.CFrame + Vector3.new(xOffset, 2, zOffset)
-                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-50000, 50000), 25000, math.random(-50000, 50000))
+                -- MODO LUTA DE SCRIPT EXTREMO: Força o personagem a atravessar colisão com velocidade estourada para cima e para fora
+                rootPart.CFrame = targetRoot.CFrame + Vector3.new(0, 1, 0)
+                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-99999, 99999), 85000, math.random(-99999, 99999))
                 rootPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
             else
                 -- MODO FLING NORMAL: Afunda para baixo direto no void
