@@ -71,7 +71,7 @@ screenGui.Parent = PlayerGui
 -- Janela Principal (Posicionada à esquerda da tela por padrão)
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 420)
-mainFrame.Position = UDim2.new(0, 20, 0, 50) -- Fixo na lateral esquerda
+mainFrame.Position = UDim2.new(0, 20, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -743,7 +743,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Dinâmico (Comutável: Normal vs Luta de Script / Fora do Mapa)
+-- Loop Fling Dinâmico (Comutável: Normal vs Luta de Script / Órbita Agressiva)
 task.spawn(function()
     while true do
         if not flingActive then
@@ -763,21 +763,21 @@ task.spawn(function()
         local function applyFlingForce(targetRoot)
             pcall(function()
                 targetRoot.CanCollide = true
+                targetRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
                 for _, part in ipairs(targetRoot.Parent:GetChildren()) do
                     if part:IsA("BasePart") then part.CanCollide = true end
                 end
             end)
 
             if scriptFightActive then
-                -- MODO LUTA DE SCRIPT: Força horizontal e alta para lançar para fora do mapa (burlando anti-fling)
-                local randomOffset = CFrame.new(
-                    math.random(-50, 50) / 100, 
-                    math.random(10, 30) / 100, 
-                    math.random(-50, 50) / 100
-                )
-                rootPart.CFrame = targetRoot.CFrame * randomOffset
-                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-40000, 40000), 15000, math.random(-40000, 40000))
-                rootPart.AssemblyAngularVelocity = Vector3.new(60000, 60000, 60000)
+                -- MODO LUTA DE SCRIPT: Órbita rápida em círculo + velocidade agressiva para lançar para fora do mapa
+                local angle = tick() * 50
+                local xOffset = math.cos(angle) * 3
+                local zOffset = math.sin(angle) * 3
+                
+                rootPart.CFrame = targetRoot.CFrame + Vector3.new(xOffset, 2, zOffset)
+                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-50000, 50000), 25000, math.random(-50000, 50000))
+                rootPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
             else
                 -- MODO FLING NORMAL: Afunda para baixo direto no void
                 local randomOffset = CFrame.new(
