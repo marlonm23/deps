@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Absoluta (Otimizada)
+    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Avançada (Physics Align)
 --]]
 
 local Players = game:GetService("Players")
@@ -533,13 +533,22 @@ antiFlingButton.MouseButton1Click:Connect(function()
     antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
--- SISTEMA DE GERENCIAMENTO DE CONSTRAINTS DE PROTEÇÃO
+-- SISTEMA DE GERENCIAMENTO DE CONSTRAINTS DE PROTEÇÃO AVANÇADA (PHYSICS ALIGN)
 local guardConstraints = {}
+local alignPos = nil
+local alignRot = nil
+local attachMy = nil
+local attachTarget = nil
+
 local function clearGuardConstraints()
     for _, nc in ipairs(guardConstraints) do
         pcall(function() nc:Destroy() end)
     end
     table.clear(guardConstraints)
+    if alignPos then pcall(function() alignPos:Destroy() end) alignPos = nil end
+    if alignRot then pcall(function() alignRot:Destroy() end) alignRot = nil end
+    if attachMy then pcall(function() attachMy:Destroy() end) attachMy = nil end
+    if attachTarget then pcall(function() attachTarget:Destroy() end) attachTarget = nil end
 end
 
 guardButton.MouseButton1Click:Connect(function()
@@ -629,11 +638,11 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
--- SISTEMA DE PROTEÇÃO TOTAL OTIMIZADO (RenderStepped para Teletransporte instantâneo e sem atraso)
+-- SISTEMA DE PROTEÇÃO TOTAL COM ALIGNPOSITION/ALIGNORIENTATION (MOTOR DE FÍSICA)
 local lastGuardedChar = nil
-RunService.RenderStepped:Connect(function()
+RunService.Stepped:Connect(function()
     if not guardActive then
-        if #guardConstraints > 0 then
+        if #guardConstraints > 0 or alignPos ~= nil then
             clearGuardConstraints()
             lastGuardedChar = nil
         end
@@ -656,17 +665,43 @@ RunService.RenderStepped:Connect(function()
             end
 
             pcall(function()
-                -- Congela a movimentação autônoma do alvo protegido para que ele não ande
+                -- Congela o alvo para ele não conseguir se mover
                 if targetHumanoid then
                     targetHumanoid.PlatformStand = true
                 end
 
-                -- Zera imediatamente qualquer impulso físico no alvo
                 targetRoot.AssemblyLinearVelocity = Vector3.zero
                 targetRoot.AssemblyAngularVelocity = Vector3.zero
 
-                -- Cria NoCollisionConstraint entre o alvo e todos os outros jogadores (exceto você)
-                if #guardConstraints == 0 then
+                -- Cria as restrições físicas avançadas de alinhamento rígido se ainda não existirem
+                if not alignPos or not alignPos.Parent then
+                    clearGuardConstraints()
+
+                    attachMy = Instance.new("Attachment")
+                    attachMy.Name = "GuardAttachMy"
+                    attachMy.Parent = myRoot
+
+                    attachTarget = Instance.new("Attachment")
+                    attachTarget.Name = "GuardAttachTarget"
+                    attachTarget.Parent = targetRoot
+
+                    alignPos = Instance.new("AlignPosition")
+                    alignPos.Name = "GuardAlignPos"
+                    alignPos.Mode = Enum.PositionAlignmentMode.TwoAttachment
+                    alignPos.Attachment0 = attachMy
+                    alignPos.Attachment1 = attachTarget
+                    alignPos.RigidityEnabled = true -- Rigidez total (solda física via motor)
+                    alignPos.Parent = myRoot
+
+                    alignRot = Instance.new("AlignOrientation")
+                    alignRot.Name = "GuardAlignRot"
+                    alignRot.Mode = Enum.OrientationAlignmentMode.TwoAttachment
+                    alignRot.Attachment0 = attachMy
+                    alignRot.Attachment1 = attachTarget
+                    alignRot.RigidityEnabled = true
+                    alignRot.Parent = myRoot
+
+                    -- Isola colisão entre o alvo e todos os outros jogadores
                     for _, otherPlayer in ipairs(Players:GetPlayers()) do
                         if otherPlayer ~= LocalPlayer and otherPlayer ~= targetPlayer and otherPlayer.Character then
                             for _, tPart in ipairs(targetChar:GetDescendants()) do
@@ -686,16 +721,11 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
 
-                -- Teletransporte instantâneo e colado milimetricamente no alvo
-                myRoot.CFrame = targetRoot.CFrame
-                myRoot.AssemblyLinearVelocity = Vector3.zero
-                myRoot.AssemblyAngularVelocity = Vector3.zero
-                myRoot.CanCollide = true
                 myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
             end)
         end
     else
-        if #guardConstraints > 0 then
+        if #guardConstraints > 0 or alignPos ~= nil then
             clearGuardConstraints()
             lastGuardedChar = nil
         end
@@ -1038,7 +1068,7 @@ task.spawn(function()
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
                         local duration = 1.2
-                        while flingActive and todosActive and not guardActive and isValidTarget(targetChar) and (tick() - startTick < duration) do
+                        while flingActive and todosActive and not guardActive and isValidTarget(targetChar) and (tick() - startTag < duration) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
                             if not character or not rootPart then break end
