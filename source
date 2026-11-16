@@ -17,6 +17,7 @@ local savedConfig = _G.MassFlingConfig or {
     antiFlingActive = true,
     invisibleActive = false,
     throwPartsActive = false,
+    guardActive = false,
     targetText = ""
 }
 
@@ -26,6 +27,7 @@ local todosActive = savedConfig.todosActive
 local antiFlingActive = savedConfig.antiFlingActive
 local invisibleActive = savedConfig.invisibleActive
 local throwPartsActive = savedConfig.throwPartsActive
+local guardActive = savedConfig.guardActive or false
 
 local preTeleportPos = nil
 local lastSafeCFrame = nil
@@ -46,12 +48,13 @@ local function saveStateAndTeleport(teleportFunction)
                 antiFlingActive = %s,
                 invisibleActive = %s,
                 throwPartsActive = %s,
+                guardActive = %s,
                 targetText = %q
             }
             loadstring(game:HttpGet(%q))()
         ]], 
         tostring(flingActive), tostring(scriptFightActive), tostring(todosActive), tostring(antiFlingActive), 
-        tostring(invisibleActive), tostring(throwPartsActive), targetVal, scriptUrl)
+        tostring(invisibleActive), tostring(throwPartsActive), tostring(guardActive), targetVal, scriptUrl)
 
         pcall(function()
             queueteleport(codeToQueue)
@@ -69,9 +72,9 @@ screenGui.Name = "MassFlingUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
--- Janela Principal
+-- Janela Principal (Aumentada levemente para caber o novo botão)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 420)
+mainFrame.Size = UDim2.new(0, 240, 0, 460)
 mainFrame.Position = UDim2.new(0, 20, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
 mainFrame.BorderSizePixel = 0
@@ -139,7 +142,7 @@ local function createContentContainer()
     cont.Position = UDim2.new(0, 8, 0, 76)
     cont.BackgroundTransparency = 1
     cont.BorderSizePixel = 0
-    cont.CanvasSize = UDim2.new(0, 0, 0, 340)
+    cont.CanvasSize = UDim2.new(0, 0, 0, 380)
     cont.ScrollBarThickness = 3
     cont.Visible = false
     cont.Parent = mainFrame
@@ -218,11 +221,12 @@ local flingButton = createButton(tab1Content, flingActive and "Fling: ATIVADO" o
 local scriptFightButton = createButton(tab1Content, scriptFightActive and "Luta de Script: ON" or "Luta de Script: OFF", 36, scriptFightActive and Color3.fromRGB(180, 120, 40) or Color3.fromRGB(60, 60, 70))
 local todosButton = createButton(tab1Content, todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO", 72, todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local antiFlingButton = createButton(tab1Content, antiFlingActive and "Proteção Total: ON" or "Proteção Total: OFF", 108, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local invisibleButton = createButton(tab1Content, invisibleActive and "Invisível: ON" or "Invisível: OFF", 144, invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local guardButton = createButton(tab1Content, guardActive and "Proteção: ON" or "Proteção: OFF", 144, guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local invisibleButton = createButton(tab1Content, invisibleActive and "Invisível: ON" or "Invisível: OFF", 180, invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 
 local targetBox = Instance.new("TextBox")
 targetBox.Size = UDim2.new(1, 0, 0, 30)
-targetBox.Position = UDim2.new(0, 0, 0, 180)
+targetBox.Position = UDim2.new(0, 0, 0, 216)
 targetBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
@@ -238,9 +242,9 @@ targetBox:GetPropertyChangedSignal("Text"):Connect(function()
     savedConfig.targetText = targetBox.Text
 end)
 
-local throwPartsButton = createButton(tab1Content, throwPartsActive and "Blocos no Peito: ON" or "Blocos no Peito: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 252, Color3.fromRGB(90, 60, 180))
-local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 288, Color3.fromRGB(40, 130, 90))
+local throwPartsButton = createButton(tab1Content, throwPartsActive and "Blocos no Peito: ON" or "Blocos no Peito: OFF", 252, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 288, Color3.fromRGB(90, 60, 180))
+local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 324, Color3.fromRGB(40, 130, 90))
 
 -- ABA 2: INIMIGOS JSON
 local filterBox = Instance.new("TextBox")
@@ -529,6 +533,12 @@ antiFlingButton.MouseButton1Click:Connect(function()
     antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
+guardButton.MouseButton1Click:Connect(function()
+    guardActive = not guardActive
+    guardButton.Text = guardActive and "Proteção: ON" or "Proteção: OFF"
+    guardButton.BackgroundColor3 = guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
+end)
+
 invisibleButton.MouseButton1Click:Connect(function()
     invisibleActive = not invisibleActive
     local char = LocalPlayer.Character
@@ -600,6 +610,51 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
+-- SISTEMA DO BOTÃO DE PROTEÇÃO (Cola no Alvo Protegido e bloqueia velocity de Fling nele)
+task.spawn(function()
+    while true do
+        if not guardActive then
+            task.wait(0.2)
+            continue
+        end
+
+        local targetPlayer = getTargetPlayer()
+        if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+            local targetChar = targetPlayer.Character
+            local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+            
+            if targetRoot then
+                -- Anula a velocidade do jogador protegido para impedir que ele tome Fling
+                pcall(function()
+                    if targetRoot.AssemblyLinearVelocity.Magnitude > 120 or targetRoot.AssemblyAngularVelocity.Magnitude > 120 then
+                        targetRoot.AssemblyLinearVelocity = Vector3.zero
+                        targetRoot.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end)
+
+                -- Cola você nele enquanto a proteção estiver ativa
+                while guardActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                    local myChar = LocalPlayer.Character
+                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                    if not myRoot then break end
+
+                    pcall(function()
+                        if targetRoot.AssemblyLinearVelocity.Magnitude > 120 or targetRoot.AssemblyAngularVelocity.Magnitude > 120 then
+                            targetRoot.AssemblyLinearVelocity = Vector3.zero
+                            targetRoot.AssemblyAngularVelocity = Vector3.zero
+                        end
+                    end)
+
+                    myRoot.CFrame = targetRoot.CFrame
+                    RunService.Heartbeat:Wait()
+                end
+            end
+        else
+            task.wait(0.3)
+        end
+    end
+end)
+
 -- AUTO-REJOIN SEGURO
 task.spawn(function()
     task.wait(8)
@@ -651,7 +706,7 @@ end)
 
 -- REDE DE SIMULAÇÃO MÁXIMA
 RunService.Heartbeat:Connect(function()
-    if throwPartsActive or flingActive then
+    if throwPartsActive or flingActive or guardActive then
         pcall(function()
             sethiddenproperty(LocalPlayer, "SimulationRadius", 999999)
         end)
@@ -801,10 +856,10 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- PERSEGUIÇÃO DO TORNADO DE PEITO (Agora prioriza o mais próximo e fica 1.5s na pessoa)
+-- PERSEGUIÇÃO DO TORNADO DE PEITO (Prioriza o mais perto e fica 1.5s na pessoa)
 task.spawn(function()
     while true do
-        if not throwPartsActive or flingActive then
+        if not throwPartsActive or flingActive or guardActive then
             task.wait(0.15)
             continue
         end
@@ -828,21 +883,19 @@ task.spawn(function()
                 end
             end
 
-            -- Ordena do mais perto para o mais longe
             table.sort(validTargets, function(a, b)
                 return a.dist < b.dist
             end)
 
             if #validTargets > 0 then
                 for _, targetData in ipairs(validTargets) do
-                    if not throwPartsActive or not todosActive or flingActive then break end
+                    if not throwPartsActive or not todosActive or flingActive or guardActive then break end
                     local targetChar = targetData.char
                     local targetRoot = targetData.root
                     
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        -- Fica colado no alvo mais próximo por 1.5s antes de reavaliar
-                        while throwPartsActive and todosActive and not flingActive and isValidTarget(targetChar) and (tick() - startTick < 1.5) do
+                        while throwPartsActive and todosActive and not flingActive and not guardActive and isValidTarget(targetChar) and (tick() - startTick < 1.5) do
                             myChar = LocalPlayer.Character
                             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                             if not myRoot then break end
@@ -860,7 +913,7 @@ task.spawn(function()
                 local targetChar = targetPlayer.Character
                 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                 if targetRoot then
-                    while throwPartsActive and not todosActive and not flingActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                    while throwPartsActive and not todosActive and not flingActive and not guardActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
                         myChar = LocalPlayer.Character
                         myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                         if not myRoot then break end
@@ -869,16 +922,16 @@ task.spawn(function()
                     end
                 end
             else
-                task.wait(0.3)
+                task.wait(0.2)
             end
         end
     end
 end)
 
--- Loop Fling Dinâmico (Agora prioriza o mais próximo e fica 1.2s na pessoa)
+-- Loop Fling Dinâmico (Prioriza o mais perto e fica 1.2s na pessoa)
 task.spawn(function()
     while true do
-        if not flingActive then
+        if not flingActive or guardActive then
             task.wait(0.2)
             continue
         end
@@ -929,22 +982,20 @@ task.spawn(function()
                 end
             end
 
-            -- Ordena do mais perto para o mais longe
             table.sort(validTargets, function(a, b)
                 return a.dist < b.dist
             end)
 
             if #validTargets > 0 then
                 for _, targetData in ipairs(validTargets) do
-                    if not flingActive or not todosActive then break end
+                    if not flingActive or not todosActive or guardActive then break end
                     local targetChar = targetData.char
                     local targetRoot = targetData.root
                     
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        -- Aumentado para 1.2s para ficar mais tempo na mesma pessoa
                         local duration = 1.2
-                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < duration) do
+                        while flingActive and todosActive and not guardActive and isValidTarget(targetChar) and (tick() - startTick < duration) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
                             if not character or not rootPart then break end
@@ -964,7 +1015,7 @@ task.spawn(function()
                 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot then
-                    while flingActive and not todosActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                    while flingActive and not todosActive and not guardActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
                         character = LocalPlayer.Character
                         rootPart = character and character:FindFirstChild("HumanoidRootPart")
                         if not character or not rootPart then break end
