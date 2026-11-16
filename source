@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Absoluta + Aba Auto Iniciar
+    Script: Mass Walkfling (Para Baixo) + Aba Vs Script (Ultra-Rápida) + Proteção + Auto Iniciar
 --]]
 
 local Players = game:GetService("Players")
@@ -18,6 +18,8 @@ local savedConfig = _G.MassFlingConfig or {
     throwPartsActive = false,
     guardActive = false,
     autoStartActive = false,
+    vsScriptActive = false,
+    vsScriptTarget = "",
     targetText = ""
 }
 
@@ -28,6 +30,7 @@ local invisibleActive = savedConfig.invisibleActive
 local throwPartsActive = savedConfig.throwPartsActive
 local guardActive = savedConfig.guardActive or false
 local autoStartActive = savedConfig.autoStartActive or false
+local vsScriptActive = savedConfig.vsScriptActive or false
 
 local preTeleportPos = nil
 local lastSafeCFrame = nil
@@ -38,6 +41,7 @@ local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (f
 local function saveStateAndTeleport(teleportFunction)
     if queueteleport then
         local targetVal = targetBox and targetBox.Text or savedConfig.targetText
+        local vsTargetVal = vsTargetBox and vsTargetBox.Text or savedConfig.vsScriptTarget
         
         local codeToQueue = string.format([[
             _G.MassFlingConfig = {
@@ -48,12 +52,15 @@ local function saveStateAndTeleport(teleportFunction)
                 throwPartsActive = %s,
                 guardActive = %s,
                 autoStartActive = %s,
+                vsScriptActive = %s,
+                vsScriptTarget = %q,
                 targetText = %q
             }
             loadstring(game:HttpGet(%q))()
         ]], 
         tostring(flingActive), tostring(todosActive), tostring(antiFlingActive), 
-        tostring(invisibleActive), tostring(throwPartsActive), tostring(guardActive), tostring(autoStartActive), targetVal, scriptUrl)
+        tostring(invisibleActive), tostring(throwPartsActive), tostring(guardActive), 
+        tostring(autoStartActive), tostring(vsScriptActive), vsTargetVal, targetVal, scriptUrl)
 
         pcall(function()
             queueteleport(codeToQueue)
@@ -73,7 +80,7 @@ screenGui.Parent = PlayerGui
 
 -- Janela Principal
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 420)
+mainFrame.Size = UDim2.new(0, 260, 0, 420)
 mainFrame.Position = UDim2.new(0, 20, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
 mainFrame.BorderSizePixel = 0
@@ -104,10 +111,10 @@ titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.Text = "⚡ Hub Principal & Auto"
+titleLabel.Text = "⚡ Hub Principal & Vs Script"
 titleLabel.Parent = topBar
 
--- Sistema de Abas (2 Abas: Controles e Auto)
+-- Sistema de Abas (3 Abas: Controles, Vs Script, Auto)
 local tabContainer = Instance.new("Frame")
 tabContainer.Size = UDim2.new(1, -16, 0, 30)
 tabContainer.Position = UDim2.new(0, 8, 0, 40)
@@ -130,8 +137,9 @@ local function createTabButton(posX, sizeX, text)
     return btn
 end
 
-local tab1Btn = createTabButton(0, 0.5, "Controles")
-local tab2Btn = createTabButton(0.5, 0.5, "Auto Iniciar")
+local tab1Btn = createTabButton(0, 0.333, "Controles")
+local tab2Btn = createTabButton(0.333, 0.334, "⚔️ Vs Script")
+local tab3Btn = createTabButton(0.667, 0.333, "Auto Iniciar")
 
 -- Containers de Conteúdo
 local function createContentContainer(canvasHeight)
@@ -153,16 +161,19 @@ tab1Btn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
 tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 
 local tab2Content = createContentContainer(340)
-tab2Content.Visible = false
+local tab3Content = createContentContainer(340)
 
 local function resetTabStyles()
     tab1Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     tab1Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
     tab2Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     tab2Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
+    tab3Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    tab3Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
 
     tab1Content.Visible = false
     tab2Content.Visible = false
+    tab3Content.Visible = false
 end
 
 tab1Btn.MouseButton1Click:Connect(function()
@@ -175,8 +186,15 @@ end)
 tab2Btn.MouseButton1Click:Connect(function()
     resetTabStyles()
     tab2Content.Visible = true
-    tab2Btn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+    tab2Btn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
     tab2Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+end)
+
+tab3Btn.MouseButton1Click:Connect(function()
+    resetTabStyles()
+    tab3Content.Visible = true
+    tab3Btn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+    tab3Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
 
 local function createButton(parent, text, posY, color)
@@ -193,8 +211,10 @@ local function createButton(parent, text, posY, color)
     return btn
 end
 
--- ABA 1: CONTROLES
-local flingButton = createButton(tab1Content, flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO", 0, flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+-- ==========================================
+-- ABA 1: CONTROLES NORMAIS (FLING PARA BAIXO)
+-- ==========================================
+local flingButton = createButton(tab1Content, flingActive and "Fling (Baixo): ATIVADO" or "Fling (Baixo): DESATIVADO", 0, flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local todosButton = createButton(tab1Content, todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO", 36, todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local antiFlingButton = createButton(tab1Content, antiFlingActive and "Proteção Total: ON" or "Proteção Total: OFF", 72, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local guardButton = createButton(tab1Content, guardActive and "Proteção Alvo: ON" or "Proteção Alvo: OFF", 108, guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
@@ -222,9 +242,76 @@ local throwPartsButton = createButton(tab1Content, throwPartsActive and "Blocos 
 local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 252, Color3.fromRGB(90, 60, 180))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 288, Color3.fromRGB(40, 130, 90))
 
--- ABA 2: AUTO INICIAR (Localizador e Pressionador de Botões)
-local autoStartBtn = createButton(tab2Content, autoStartActive and "Auto Pressionar: LIGADO" or "Auto Pressionar: DESLIGADO", 0, autoStartActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local scanButtonsBtn = createButton(tab2Content, "🔍 Escanear e Pressionar Agora", 36, Color3.fromRGB(45, 120, 220))
+-- ==========================================
+-- ABA 2: VS SCRIPT (COMBATE ULTRA-RÁPIDO)
+-- ==========================================
+local vsTargetBox = Instance.new("TextBox")
+vsTargetBox.Size = UDim2.new(1, 0, 0, 32)
+vsTargetBox.Position = UDim2.new(0, 0, 0, 0)
+vsTargetBox.BackgroundColor3 = Color3.fromRGB(35, 25, 28)
+vsTargetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+vsTargetBox.PlaceholderColor3 = Color3.fromRGB(180, 130, 130)
+vsTargetBox.PlaceholderText = "Nick do Script Inimigo..."
+vsTargetBox.Text = savedConfig.vsScriptTarget or ""
+vsTargetBox.TextSize = 12
+vsTargetBox.Font = Enum.Font.SourceSansBold
+vsTargetBox.Parent = tab2Content
+Instance.new("UICorner", vsTargetBox).CornerRadius = UDim.new(0, 6)
+
+vsTargetBox:GetPropertyChangedSignal("Text"):Connect(function()
+    savedConfig.vsScriptTarget = vsTargetBox.Text
+end)
+
+local vsFightBtn = createButton(
+    tab2Content, 
+    vsScriptActive and "⚔️ MODO VS SCRIPT: ATIVO" or "⚔️ INICIAR VS SCRIPT", 
+    38, 
+    vsScriptActive and Color3.fromRGB(220, 40, 40) or Color3.fromRGB(60, 60, 70)
+)
+
+local vsSyncTargetBtn = createButton(tab2Content, "📋 Copiar Alvo da Aba 1", 74, Color3.fromRGB(45, 90, 160))
+
+local vsInfoLabel = Instance.new("TextLabel")
+vsInfoLabel.Size = UDim2.new(1, 0, 0, 195)
+vsInfoLabel.Position = UDim2.new(0, 0, 0, 112)
+vsInfoLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+vsInfoLabel.TextColor3 = Color3.fromRGB(210, 210, 220)
+vsInfoLabel.TextSize = 11
+vsInfoLabel.Font = Enum.Font.Code
+vsInfoLabel.TextWrapped = true
+vsInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+vsInfoLabel.TextYAlignment = Enum.TextYAlignment.Top
+vsInfoLabel.Text = " [MODO DE ALTA FREQUÊNCIA]\n\n • Tracking: RenderStepped +\n   Heartbeat (0ms delay)\n • Previsão de TP/Velocidade\n • Esmagamento Descendente\n   (-85.000 Y) + Torque Max\n • Ignora pausa de troca de\n   alvo para acompanhar TP.\n\n ⚠️ Mantenha 'Proteção Total'\n ativada na Aba 1."
+vsInfoLabel.Parent = tab2Content
+Instance.new("UICorner", vsInfoLabel).CornerRadius = UDim.new(0, 6)
+
+vsSyncTargetBtn.MouseButton1Click:Connect(function()
+    vsTargetBox.Text = targetBox.Text
+    savedConfig.vsScriptTarget = targetBox.Text
+end)
+
+vsFightBtn.MouseButton1Click:Connect(function()
+    vsScriptActive = not vsScriptActive
+    if vsScriptActive then
+        -- Garante que a proteção própria esteja ligada ao lutar contra script
+        if not antiFlingActive then
+            antiFlingActive = true
+            antiFlingButton.Text = "Proteção Total: ON"
+            antiFlingButton.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+        end
+        flingActive = false
+        flingButton.Text = "Fling (Baixo): DESATIVADO"
+        flingButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    end
+    vsFightBtn.Text = vsScriptActive and "⚔️ MODO VS SCRIPT: ATIVO" or "⚔️ INICIAR VS SCRIPT"
+    vsFightBtn.BackgroundColor3 = vsScriptActive and Color3.fromRGB(220, 40, 40) or Color3.fromRGB(60, 60, 70)
+end)
+
+-- ==========================================
+-- ABA 3: AUTO INICIAR
+-- ==========================================
+local autoStartBtn = createButton(tab3Content, autoStartActive and "Auto Pressionar: LIGADO" or "Auto Pressionar: DESLIGADO", 0, autoStartActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local scanButtonsBtn = createButton(tab3Content, "🔍 Escanear e Pressionar Agora", 36, Color3.fromRGB(45, 120, 220))
 
 local statusAutoLabel = Instance.new("TextLabel")
 statusAutoLabel.Size = UDim2.new(1, 0, 0, 180)
@@ -236,7 +323,7 @@ statusAutoLabel.Font = Enum.Font.Code
 statusAutoLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusAutoLabel.TextYAlignment = Enum.TextYAlignment.Top
 statusAutoLabel.Text = " Pronto para localizar botões\n de iniciar/jogar..."
-statusAutoLabel.Parent = tab2Content
+statusAutoLabel.Parent = tab3Content
 Instance.new("UICorner", statusAutoLabel).CornerRadius = UDim.new(0, 6)
 
 local function simulateClick(obj)
@@ -333,7 +420,12 @@ end)
 
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
-    flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
+    if flingActive and vsScriptActive then
+        vsScriptActive = false
+        vsFightBtn.Text = "⚔️ INICIAR VS SCRIPT"
+        vsFightBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    end
+    flingButton.Text = flingActive and "Fling (Baixo): ATIVADO" or "Fling (Baixo): DESATIVADO"
     flingButton.BackgroundColor3 = flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
@@ -407,8 +499,8 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-local function getTargetPlayer()
-    local query = targetBox.Text:lower()
+local function findPlayerByQuery(queryText)
+    local query = queryText:lower()
     if query == "" then return nil end
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -421,12 +513,17 @@ local function getTargetPlayer()
     return nil
 end
 
+local function getTargetPlayer()
+    return findPlayerByQuery(targetBox.Text)
+end
+
 local function isValidTarget(targetChar)
     if not targetChar then return false end
     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
     return targetRoot ~= nil
 end
 
+-- Proteção Alvo (Aba 1)
 RunService.RenderStepped:Connect(function()
     if not guardActive then return end
 
@@ -450,47 +547,82 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ==============================================================
+-- LOOP ULTRA-RÁPIDO: VS SCRIPT (RENDERSTEPPED + HEARTBEAT)
+-- ==============================================================
+local vsTick = 0
+local function executeVsScriptAttack()
+    if not vsScriptActive or guardActive then return end
+
+    local targetPlayer = findPlayerByQuery(vsTargetBox.Text)
+    if not targetPlayer or not targetPlayer.Character or not isValidTarget(targetPlayer.Character) then return end
+
+    local targetChar = targetPlayer.Character
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+
+    if not targetRoot or not myRoot or not myHum or myHum.Health <= 0 then return end
+
+    vsTick = vsTick + 1
+
+    pcall(function()
+        -- Garante física e colisão do seu personagem para transferir o impacto
+        myHum:ChangeState(Enum.HumanoidStateType.Physics)
+        for _, part in ipairs(myChar:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+                part.Massless = false
+            end
+        end
+        myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 0, 1, 0)
+
+        -- Previsão de posição caso o script inimigo esteja se movendo ou teleportando rápido
+        local predictedPos = targetRoot.Position + (targetRoot.AssemblyLinearVelocity * 0.04)
+        
+        -- Alterna micro-ângulos em altíssima frequência para furar o Anti-Fling do oponente e empurrar para o chão
+        local jitterX = ((vsTick % 3) - 1) * 0.45
+        local jitterZ = (((vsTick + 1) % 3) - 1) * 0.45
+        local offsetCFrame = CFrame.new(predictedPos + Vector3.new(jitterX, 0.8, jitterZ)) * CFrame.Angles(
+            math.rad((vsTick * 97) % 360),
+            math.rad((vsTick * 131) % 360),
+            math.rad((vsTick * 173) % 360)
+        )
+
+        myRoot.CFrame = offsetCFrame
+        -- Impulso extremo para baixo (-85000) com rotação máxima
+        myRoot.AssemblyLinearVelocity = Vector3.new(
+            math.random(-25000, 25000),
+            -85000,
+            math.random(-25000, 25000)
+        )
+        myRoot.AssemblyAngularVelocity = Vector3.new(999999, 999999, 999999)
+    end)
+end
+
+-- Executa tanto no RenderStepped (antes do frame) quanto no Heartbeat (após a física) para acompanhar TP instantâneo
+RunService.RenderStepped:Connect(executeVsScriptAttack)
+RunService.Heartbeat:Connect(executeVsScriptAttack)
+
+-- Auto Rejoin se o alvo sair do servidor
 task.spawn(function()
     task.wait(8)
     while true do
         task.wait(3.0)
         pcall(function()
-            if (flingActive or throwPartsActive) and not todosActive then
-                local query = targetBox.Text:lower()
-                if query ~= "" and #query >= 2 then
-                    local targetInServer = false
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer then
-                            local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
-                            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
-                                targetInServer = true
-                                break
-                            end
-                        end
-                    end
+            local activeQuery = vsScriptActive and vsTargetBox.Text:lower() or ((flingActive or throwPartsActive) and not todosActive and targetBox.Text:lower() or "")
+            if activeQuery ~= "" and #activeQuery >= 2 then
+                local targetInServer = findPlayerByQuery(activeQuery) ~= nil
 
-                    if not targetInServer then
-                        task.wait(3.0)
-                        local currentQuery = targetBox.Text:lower()
-                        if currentQuery == query then
-                            local doubleCheck = false
-                            for _, p in ipairs(Players:GetPlayers()) do
-                                if p ~= LocalPlayer then
-                                    local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
-                                    if pName:sub(1, #currentQuery) == currentQuery or pDisp:sub(1, #currentQuery) == currentQuery or pName:find(currentQuery) or pDisp:find(currentQuery) then
-                                        doubleCheck = true
-                                        break
-                                    end
-                                end
-                            end
-
-                            if not doubleCheck then
-                                saveStateAndTeleport(function()
-                                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-                                end)
-                                return
-                            end
-                        end
+                if not targetInServer then
+                    task.wait(3.0)
+                    local currentQuery = vsScriptActive and vsTargetBox.Text:lower() or targetBox.Text:lower()
+                    if currentQuery == activeQuery and findPlayerByQuery(currentQuery) == nil then
+                        saveStateAndTeleport(function()
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                        end)
+                        return
                     end
                 end
             end
@@ -498,14 +630,16 @@ task.spawn(function()
     end
 end)
 
+-- Network Ownership máximo
 RunService.Heartbeat:Connect(function()
-    if throwPartsActive or flingActive or guardActive then
+    if throwPartsActive or flingActive or guardActive or vsScriptActive then
         pcall(function()
             sethiddenproperty(LocalPlayer, "SimulationRadius", 999999)
         end)
     end
 end)
 
+-- Proteção Total (Anti-Fling e Anti-Void)
 RunService.Stepped:Connect(function()
     if not antiFlingActive then return end
     
@@ -528,19 +662,21 @@ RunService.Stepped:Connect(function()
             lastSafeCFrame = root.CFrame
         end
 
+        -- Se você cair abaixo de -50 (mesmo durante Vs Script), volta para a superfície
         if root.Position.Y < -50 and lastSafeCFrame then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
             root.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
         end
 
-        if not flingActive and not guardActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
+        if not flingActive and not guardActive and not vsScriptActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
         end
     end
 end)
 
+-- Blocos no Peito
 local activeOrbitParts = {}
 
 local function clearOrbitParts()
@@ -631,9 +767,10 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- Perseguição Blocos no Peito
 task.spawn(function()
     while true do
-        if not throwPartsActive or flingActive or guardActive then
+        if not throwPartsActive or flingActive or guardActive or vsScriptActive then
             task.wait(0.15)
             continue
         end
@@ -663,13 +800,13 @@ task.spawn(function()
 
             if #validTargets > 0 then
                 for _, targetData in ipairs(validTargets) do
-                    if not throwPartsActive or not todosActive or flingActive or guardActive then break end
+                    if not throwPartsActive or not todosActive or flingActive or guardActive or vsScriptActive then break end
                     local targetChar = targetData.char
                     local targetRoot = targetData.root
                     
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        while throwPartsActive and todosActive and not flingActive and not guardActive and isValidTarget(targetChar) and (tick() - startTick < 1.5) do
+                        while throwPartsActive and todosActive and not flingActive and not guardActive and not vsScriptActive and isValidTarget(targetChar) and (tick() - startTick < 1.5) do
                             myChar = LocalPlayer.Character
                             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                             if not myRoot then break end
@@ -687,7 +824,7 @@ task.spawn(function()
                 local targetChar = targetPlayer.Character
                 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                 if targetRoot then
-                    while throwPartsActive and not todosActive and not flingActive and not guardActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                    while throwPartsActive and not todosActive and not flingActive and not guardActive and not vsScriptActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
                         myChar = LocalPlayer.Character
                         myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                         if not myRoot then break end
@@ -702,10 +839,13 @@ task.spawn(function()
     end
 end)
 
+-- ==============================================================
+-- LOOP DE FLING NORMAL CORRIGIDO (JOGA O PLAYER PARA BAIXO)
+-- ==============================================================
 task.spawn(function()
     while true do
-        if not flingActive or guardActive then
-            task.wait(0.2)
+        if not flingActive or guardActive or vsScriptActive then
+            task.wait(0.15)
             continue
         end
 
@@ -714,26 +854,45 @@ task.spawn(function()
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
         if not rootPart or not humanoid or humanoid.Health <= 0 then
-            task.wait(0.5)
+            task.wait(0.3)
             continue
         end
 
-        local function applyFlingForce(targetRoot)
+        local function applyDownwardFling(targetRoot)
             pcall(function()
+                -- Ativa estado físico no seu personagem para evitar que o Humanoid anule o impacto
+                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                
+                -- Garante colisão sólida no seu personagem
+                for _, myPart in ipairs(character:GetChildren()) do
+                    if myPart:IsA("BasePart") then
+                        myPart.CanCollide = true
+                        myPart.Massless = false
+                    end
+                end
+                rootPart.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 0, 1, 0)
+
+                -- Garante colisão no alvo
                 targetRoot.CanCollide = true
-                targetRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
                 for _, part in ipairs(targetRoot.Parent:GetChildren()) do
                     if part:IsA("BasePart") then part.CanCollide = true end
                 end
             end)
 
-            local randomOffset = CFrame.new(
-                math.random(-100, 100) / 100, 
-                math.random(-50, 50) / 100, 
-                math.random(-100, 100) / 100
+            -- Posiciona levemente acima do centro do alvo (+1.0 stud) e gira para esmagar para baixo
+            local offset = CFrame.new(
+                math.random(-60, 60) / 100, 
+                1.0, 
+                math.random(-60, 60) / 100
+            ) * CFrame.Angles(math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)))
+
+            rootPart.CFrame = targetRoot.CFrame * offset
+            -- Velocidade Y NEGATIVA (-55000 a -35000) para jogar o player diretamente para baixo
+            rootPart.AssemblyLinearVelocity = Vector3.new(
+                math.random(-15000, 15000), 
+                math.random(-55000, -35000), 
+                math.random(-15000, 15000)
             )
-            rootPart.CFrame = targetRoot.CFrame * randomOffset
-            rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-30000, 30000), math.random(30000, 50000), math.random(-30000, 30000))
             rootPart.AssemblyAngularVelocity = Vector3.new(999999, 999999, 999999)
         end
 
@@ -755,25 +914,26 @@ task.spawn(function()
 
             if #validTargets > 0 then
                 for _, targetData in ipairs(validTargets) do
-                    if not flingActive or not todosActive or guardActive then break end
+                    if not flingActive or not todosActive or guardActive or vsScriptActive then break end
                     local targetChar = targetData.char
                     local targetRoot = targetData.root
                     
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        local duration = 1.2
-                        while flingActive and todosActive and not guardActive and isValidTarget(targetChar) and (tick() - startTick < duration) do
+                        local duration = 1.0
+                        while flingActive and todosActive and not guardActive and not vsScriptActive and isValidTarget(targetChar) and (tick() - startTick < duration) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                            if not character or not rootPart then break end
+                            humanoid = character and character:FindFirstChildOfClass("Humanoid")
+                            if not character or not rootPart or not humanoid then break end
 
-                            applyFlingForce(targetRoot)
+                            applyDownwardFling(targetRoot)
                             RunService.Heartbeat:Wait()
                         end
                     end
                 end
             else
-                task.wait(0.3)
+                task.wait(0.2)
             end
         else
             local targetPlayer = getTargetPlayer()
@@ -782,17 +942,18 @@ task.spawn(function()
                 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot then
-                    while flingActive and not todosActive and not guardActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                    while flingActive and not todosActive and not guardActive and not vsScriptActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
                         character = LocalPlayer.Character
                         rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                        if not character or not rootPart then break end
+                        humanoid = character and character:FindFirstChildOfClass("Humanoid")
+                        if not character or not rootPart or not humanoid then break end
                         
-                        applyFlingForce(targetRoot)
+                        applyDownwardFling(targetRoot)
                         RunService.Heartbeat:Wait()
                     end
                 end
             else
-                task.wait(0.3)
+                task.wait(0.2)
             end
         end
     end
