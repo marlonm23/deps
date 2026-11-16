@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling (Para Baixo) + Aba Vs Script (Ultra-Rápida) + Proteção + Auto Iniciar
+    Script: Mass Walkfling (Para Baixo) + Aba Vs Script (Ultra-Rápida Corrigida) + Proteção + Auto Iniciar
 --]]
 
 local Players = game:GetService("Players")
@@ -281,7 +281,7 @@ vsInfoLabel.Font = Enum.Font.Code
 vsInfoLabel.TextWrapped = true
 vsInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 vsInfoLabel.TextYAlignment = Enum.TextYAlignment.Top
-vsInfoLabel.Text = " [MODO DE ALTA FREQUÊNCIA]\n\n • Tracking: RenderStepped +\n   Heartbeat (0ms delay)\n • Previsão de TP/Velocidade\n • Esmagamento Descendente\n   (-85.000 Y) + Torque Max\n • Ignora pausa de troca de\n   alvo para acompanhar TP.\n\n ⚠️ Mantenha 'Proteção Total'\n ativada na Aba 1."
+vsInfoLabel.Text = " [MODO DE IMPACTO REAL]\n\n • BodyThrust + AngularVel\n • Colisão forçada no Stepped\n • Previsão de TP/Velocidade\n • Impulso Diagonal/Void +\n   Anti-Sit automático\n • Restaura postura ao sair.\n\n ⚠️ Mantenha 'Proteção Total'\n ativada na Aba 1."
 vsInfoLabel.Parent = tab2Content
 Instance.new("UICorner", vsInfoLabel).CornerRadius = UDim.new(0, 6)
 
@@ -293,7 +293,6 @@ end)
 vsFightBtn.MouseButton1Click:Connect(function()
     vsScriptActive = not vsScriptActive
     if vsScriptActive then
-        -- Garante que a proteção própria esteja ligada ao lutar contra script
         if not antiFlingActive then
             antiFlingActive = true
             antiFlingButton.Text = "Proteção Total: ON"
@@ -302,6 +301,13 @@ vsFightBtn.MouseButton1Click:Connect(function()
         flingActive = false
         flingButton.Text = "Fling (Baixo): DESATIVADO"
         flingButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    else
+        local myChar = LocalPlayer.Character
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        if myHum then
+            myHum.PlatformStand = false
+            myHum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
     end
     vsFightBtn.Text = vsScriptActive and "⚔️ MODO VS SCRIPT: ATIVO" or "⚔️ INICIAR VS SCRIPT"
     vsFightBtn.BackgroundColor3 = vsScriptActive and Color3.fromRGB(220, 40, 40) or Color3.fromRGB(60, 60, 70)
@@ -424,6 +430,11 @@ flingButton.MouseButton1Click:Connect(function()
         vsScriptActive = false
         vsFightBtn.Text = "⚔️ INICIAR VS SCRIPT"
         vsFightBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        local myChar = LocalPlayer.Character
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        if myHum then
+            myHum.PlatformStand = false
+        end
     end
     flingButton.Text = flingActive and "Fling (Baixo): ATIVADO" or "Fling (Baixo): DESATIVADO"
     flingButton.BackgroundColor3 = flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
@@ -548,61 +559,140 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ==============================================================
--- LOOP ULTRA-RÁPIDO: VS SCRIPT (RENDERSTEPPED + HEARTBEAT)
+-- LOOP ULTRA-RÁPIDO CORRIGIDO: VS SCRIPT (IMPACTO REAL + BYPASS)
 -- ==============================================================
 local vsTick = 0
-local function executeVsScriptAttack()
-    if not vsScriptActive or guardActive then return end
+local vsThrust = nil
+local vsSpin = nil
+local wasVsActive = false
 
-    local targetPlayer = findPlayerByQuery(vsTargetBox.Text)
-    if not targetPlayer or not targetPlayer.Character or not isValidTarget(targetPlayer.Character) then return end
+local function cleanVsForces()
+    if vsThrust then pcall(function() vsThrust:Destroy() end) vsThrust = nil end
+    if vsSpin then pcall(function() vsSpin:Destroy() end) vsSpin = nil end
+end
 
-    local targetChar = targetPlayer.Character
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+-- Força colisão e Anti-Sit no Stepped (onde o Humanoid tenta desligar)
+RunService.Stepped:Connect(function()
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
 
-    if not targetRoot or not myRoot or not myHum or myHum.Health <= 0 then return end
+    if not vsScriptActive or guardActive then
+        cleanVsForces()
+        if wasVsActive and myHum then
+            wasVsActive = false
+            pcall(function()
+                myHum.PlatformStand = false
+                myHum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end)
+        end
+        return
+    end
+
+    wasVsActive = true
+    if myChar and myRoot and myHum then
+        pcall(function()
+            myHum.PlatformStand = true
+            myHum.Sit = false
+            myHum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+            for _, part in ipairs(myChar:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                    part.Massless = false
+                end
+            end
+        end)
+    end
+end)
+
+local function executeVsScriptAttack()
+    if not vsScriptActive or guardActive then 
+        cleanVsForces()
+        return 
+    end
+
+    local targetPlayer = findPlayerByQuery(vsTargetBox.Text)
+    if not targetPlayer or not targetPlayer.Character or not isValidTarget(targetPlayer.Character) then 
+        cleanVsForces()
+        return 
+    end
+
+    local targetChar = targetPlayer.Character
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+
+    if not targetRoot or not myRoot or not myHum or myHum.Health <= 0 or (targetHum and targetHum.Health <= 0) then 
+        cleanVsForces()
+        return 
+    end
 
     vsTick = vsTick + 1
 
     pcall(function()
-        -- Garante física e colisão do seu personagem para transferir o impacto
-        myHum:ChangeState(Enum.HumanoidStateType.Physics)
-        for _, part in ipairs(myChar:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-                part.Massless = false
-            end
+        -- 1. Cria forças físicas persistentes no RootPart para o servidor replicar o impacto
+        if not vsThrust or vsThrust.Parent ~= myRoot then
+            cleanVsForces()
+            vsThrust = Instance.new("BodyThrust")
+            vsThrust.Name = "VsFlingThrust"
+            vsThrust.Force = Vector3.new(999999, 999999, 999999)
+            vsThrust.Location = Vector3.new(0, 0, 0)
+            vsThrust.Parent = myRoot
+
+            vsSpin = Instance.new("BodyAngularVelocity")
+            vsSpin.Name = "VsFlingSpin"
+            vsSpin.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            vsSpin.AngularVelocity = Vector3.new(999999, 999999, 999999)
+            vsSpin.P = math.huge
+            vsSpin.Parent = myRoot
         end
-        myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 0, 1, 0)
 
-        -- Previsão de posição caso o script inimigo esteja se movendo ou teleportando rápido
-        local predictedPos = targetRoot.Position + (targetRoot.AssemblyLinearVelocity * 0.04)
-        
-        -- Alterna micro-ângulos em altíssima frequência para furar o Anti-Fling do oponente e empurrar para o chão
-        local jitterX = ((vsTick % 3) - 1) * 0.45
-        local jitterZ = (((vsTick + 1) % 3) - 1) * 0.45
-        local offsetCFrame = CFrame.new(predictedPos + Vector3.new(jitterX, 0.8, jitterZ)) * CFrame.Angles(
-            math.rad((vsTick * 97) % 360),
-            math.rad((vsTick * 131) % 360),
-            math.rad((vsTick * 173) % 360)
+        myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+
+        -- 2. Previsão de movimento do script inimigo
+        local targetVel = targetRoot.AssemblyLinearVelocity
+        if targetVel.Magnitude > 500 then
+            targetVel = Vector3.zero
+        end
+        local predictedPos = targetRoot.Position + (targetVel * 0.05)
+
+        -- 3. Alterna entre interseção direta (centro) e varredura lateral/diagonal
+        local phase = vsTick % 4
+        local offset = Vector3.zero
+        local attackVel = Vector3.zero
+
+        if phase == 0 then
+            offset = Vector3.new(0, 0, 0)
+            attackVel = Vector3.new(65000, 65000, -65000)
+        elseif phase == 1 then
+            offset = Vector3.new(0.8, -0.5, 0.8)
+            attackVel = Vector3.new(-65000, 85000, 65000)
+        elseif phase == 2 then
+            offset = Vector3.new(-0.8, 0.5, -0.8)
+            attackVel = Vector3.new(65000, -45000, 65000)
+        else
+            offset = Vector3.new(0, 0.2, 0)
+            attackVel = Vector3.new(-65000, 75000, -65000)
+        end
+
+        -- 4. Aplica CFrame com rotação caótica para enganchar nas partes R6/R15 do alvo
+        myRoot.CFrame = CFrame.new(predictedPos + offset) * CFrame.Angles(
+            math.rad((vsTick * 113) % 360),
+            math.rad((vsTick * 157) % 360),
+            math.rad((vsTick * 199) % 360)
         )
 
-        myRoot.CFrame = offsetCFrame
-        -- Impulso extremo para baixo (-85000) com rotação máxima
-        myRoot.AssemblyLinearVelocity = Vector3.new(
-            math.random(-25000, 25000),
-            -85000,
-            math.random(-25000, 25000)
-        )
+        myRoot.AssemblyLinearVelocity = attackVel
         myRoot.AssemblyAngularVelocity = Vector3.new(999999, 999999, 999999)
+        
+        if vsThrust then
+            vsThrust.Location = targetRoot.Position
+        end
     end)
 end
 
--- Executa tanto no RenderStepped (antes do frame) quanto no Heartbeat (após a física) para acompanhar TP instantâneo
-RunService.RenderStepped:Connect(executeVsScriptAttack)
 RunService.Heartbeat:Connect(executeVsScriptAttack)
 
 -- Auto Rejoin se o alvo sair do servidor
@@ -639,7 +729,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Proteção Total (Anti-Fling e Anti-Void)
+-- Proteção Total (Anti-Fling, Anti-Sit e Anti-Void)
 RunService.Stepped:Connect(function()
     if not antiFlingActive then return end
     
@@ -651,6 +741,10 @@ RunService.Stepped:Connect(function()
         pcall(function()
             humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+            if humanoid.Sit then
+                humanoid.Sit = false
+            end
             if humanoid.Health < humanoid.MaxHealth and humanoid.Health > 0 then
                 humanoid.Health = humanoid.MaxHealth
             end
@@ -662,7 +756,6 @@ RunService.Stepped:Connect(function()
             lastSafeCFrame = root.CFrame
         end
 
-        -- Se você cair abaixo de -50 (mesmo durante Vs Script), volta para a superfície
         if root.Position.Y < -50 and lastSafeCFrame then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
@@ -860,10 +953,8 @@ task.spawn(function()
 
         local function applyDownwardFling(targetRoot)
             pcall(function()
-                -- Ativa estado físico no seu personagem para evitar que o Humanoid anule o impacto
                 humanoid:ChangeState(Enum.HumanoidStateType.Physics)
                 
-                -- Garante colisão sólida no seu personagem
                 for _, myPart in ipairs(character:GetChildren()) do
                     if myPart:IsA("BasePart") then
                         myPart.CanCollide = true
@@ -872,14 +963,12 @@ task.spawn(function()
                 end
                 rootPart.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 0, 1, 0)
 
-                -- Garante colisão no alvo
                 targetRoot.CanCollide = true
                 for _, part in ipairs(targetRoot.Parent:GetChildren()) do
                     if part:IsA("BasePart") then part.CanCollide = true end
                 end
             end)
 
-            -- Posiciona levemente acima do centro do alvo (+1.0 stud) e gira para esmagar para baixo
             local offset = CFrame.new(
                 math.random(-60, 60) / 100, 
                 1.0, 
@@ -887,7 +976,6 @@ task.spawn(function()
             ) * CFrame.Angles(math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)))
 
             rootPart.CFrame = targetRoot.CFrame * offset
-            -- Velocidade Y NEGATIVA (-55000 a -35000) para jogar o player diretamente para baixo
             rootPart.AssemblyLinearVelocity = Vector3.new(
                 math.random(-15000, 15000), 
                 math.random(-55000, -35000), 
