@@ -1,5 +1,5 @@
 --[[
-    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Avançada por Rede (Network Trap)
+    Script: Mass Walkfling + Núcleo de Blocos no Peito + Perseguição Automática + Proteção Absoluta
 --]]
 
 local Players = game:GetService("Players")
@@ -12,7 +12,6 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local savedConfig = _G.MassFlingConfig or {
     flingActive = false,
-    scriptFightActive = false,
     todosActive = false,
     antiFlingActive = true,
     invisibleActive = false,
@@ -22,7 +21,6 @@ local savedConfig = _G.MassFlingConfig or {
 }
 
 local flingActive = savedConfig.flingActive
-local scriptFightActive = savedConfig.scriptFightActive
 local todosActive = savedConfig.todosActive
 local antiFlingActive = savedConfig.antiFlingActive
 local invisibleActive = savedConfig.invisibleActive
@@ -43,7 +41,6 @@ local function saveStateAndTeleport(teleportFunction)
         local codeToQueue = string.format([[
             _G.MassFlingConfig = {
                 flingActive = %s,
-                scriptFightActive = %s,
                 todosActive = %s,
                 antiFlingActive = %s,
                 invisibleActive = %s,
@@ -53,7 +50,7 @@ local function saveStateAndTeleport(teleportFunction)
             }
             loadstring(game:HttpGet(%q))()
         ]], 
-        tostring(flingActive), tostring(scriptFightActive), tostring(todosActive), tostring(antiFlingActive), 
+        tostring(flingActive), tostring(todosActive), tostring(antiFlingActive), 
         tostring(invisibleActive), tostring(throwPartsActive), tostring(guardActive), targetVal, scriptUrl)
 
         pcall(function()
@@ -74,7 +71,7 @@ screenGui.Parent = PlayerGui
 
 -- Janela Principal
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 460)
+mainFrame.Size = UDim2.new(0, 240, 0, 430)
 mainFrame.Position = UDim2.new(0, 20, 0, 50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
 mainFrame.BorderSizePixel = 0
@@ -142,7 +139,7 @@ local function createContentContainer()
     cont.Position = UDim2.new(0, 8, 0, 76)
     cont.BackgroundTransparency = 1
     cont.BorderSizePixel = 0
-    cont.CanvasSize = UDim2.new(0, 0, 0, 380)
+    cont.CanvasSize = UDim2.new(0, 0, 0, 350)
     cont.ScrollBarThickness = 3
     cont.Visible = false
     cont.Parent = mainFrame
@@ -216,17 +213,16 @@ local function createButton(parent, text, posY, color)
     return btn
 end
 
--- ABA 1: CONTROLES ORGANIZADOS
+-- ABA 1: CONTROLES ORGANIZADOS (Sem Luta de Script)
 local flingButton = createButton(tab1Content, flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO", 0, flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local scriptFightButton = createButton(tab1Content, scriptFightActive and "Luta de Script: ON" or "Luta de Script: OFF", 36, scriptFightActive and Color3.fromRGB(180, 120, 40) or Color3.fromRGB(60, 60, 70))
-local todosButton = createButton(tab1Content, todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO", 72, todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local antiFlingButton = createButton(tab1Content, antiFlingActive and "Proteção Total: ON" or "Proteção Total: OFF", 108, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local guardButton = createButton(tab1Content, guardActive and "Proteção: ON" or "Proteção: OFF", 144, guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local invisibleButton = createButton(tab1Content, invisibleActive and "Invisível: ON" or "Invisível: OFF", 180, invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local todosButton = createButton(tab1Content, todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO", 36, todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local antiFlingButton = createButton(tab1Content, antiFlingActive and "Proteção Total: ON" or "Proteção Total: OFF", 72, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local guardButton = createButton(tab1Content, guardActive and "Proteção Alvo: ON" or "Proteção Alvo: OFF", 108, guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local invisibleButton = createButton(tab1Content, invisibleActive and "Invisível: ON" or "Invisível: OFF", 144, invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 
 local targetBox = Instance.new("TextBox")
 targetBox.Size = UDim2.new(1, 0, 0, 30)
-targetBox.Position = UDim2.new(0, 0, 0, 216)
+targetBox.Position = UDim2.new(0, 0, 0, 180)
 targetBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
 targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
@@ -242,9 +238,9 @@ targetBox:GetPropertyChangedSignal("Text"):Connect(function()
     savedConfig.targetText = targetBox.Text
 end)
 
-local throwPartsButton = createButton(tab1Content, throwPartsActive and "Blocos no Peito: ON" or "Blocos no Peito: OFF", 252, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
-local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 288, Color3.fromRGB(90, 60, 180))
-local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 324, Color3.fromRGB(40, 130, 90))
+local throwPartsButton = createButton(tab1Content, throwPartsActive and "Blocos no Peito: ON" or "Blocos no Peito: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 252, Color3.fromRGB(90, 60, 180))
+local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 288, Color3.fromRGB(40, 130, 90))
 
 -- ABA 2: INIMIGOS JSON
 local filterBox = Instance.new("TextBox")
@@ -514,12 +510,6 @@ flingButton.MouseButton1Click:Connect(function()
     flingButton.BackgroundColor3 = flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
-scriptFightButton.MouseButton1Click:Connect(function()
-    scriptFightActive = not scriptFightActive
-    scriptFightButton.Text = scriptFightActive and "Luta de Script: ON" or "Luta de Script: OFF"
-    scriptFightButton.BackgroundColor3 = scriptFightActive and Color3.fromRGB(180, 120, 40) or Color3.fromRGB(60, 60, 70)
-end)
-
 todosButton.MouseButton1Click:Connect(function()
     todosActive = not todosActive
     todosButton.Text = todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO"
@@ -533,21 +523,9 @@ antiFlingButton.MouseButton1Click:Connect(function()
     antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
--- GERENCIAMENTO DE CONSTRAINTS DE PROTEÇÃO AVANÇADA POR REDE
-local guardConstraints = {}
-local function clearGuardConstraints()
-    for _, nc in ipairs(guardConstraints) do
-        pcall(function() nc:Destroy() end)
-    end
-    table.clear(guardConstraints)
-end
-
 guardButton.MouseButton1Click:Connect(function()
     guardActive = not guardActive
-    if not guardActive then
-        clearGuardConstraints()
-    end
-    guardButton.Text = guardActive and "Proteção: ON" or "Proteção: OFF"
+    guardButton.Text = guardActive and "Proteção Alvo: ON" or "Proteção Alvo: OFF"
     guardButton.BackgroundColor3 = guardActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
@@ -622,16 +600,9 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
--- SISTEMA DE PROTEÇÃO TOTAL: COLA NO ALVO E CRIA ARMADILHA DE FÍSICA POR REDE (RENDERSTEPPED)
-local lastGuardedChar = nil
+-- PROTEÇÃO DO ALVO (Gruda e neutraliza o trapaceiro)
 RunService.RenderStepped:Connect(function()
-    if not guardActive then
-        if #guardConstraints > 0 then
-            clearGuardConstraints()
-            lastGuardedChar = nil
-        end
-        return
-    end
+    if not guardActive then return end
 
     local targetPlayer = getTargetPlayer()
     if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
@@ -642,42 +613,13 @@ RunService.RenderStepped:Connect(function()
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
         if targetRoot and myRoot then
-            if lastGuardedChar ~= targetChar then
-                clearGuardConstraints()
-                lastGuardedChar = targetChar
-            end
-
             pcall(function()
-                -- Cola instantaneamente no alvo frame a frame
                 myRoot.CFrame = targetRoot.CFrame
                 myRoot.AssemblyLinearVelocity = Vector3.zero
                 myRoot.AssemblyAngularVelocity = Vector3.zero
                 myRoot.CanCollide = true
                 myRoot.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 0, 0, 0)
-
-                -- Puxa unicamente blocos do workspace para cima da cabeça do alvo usando a sua propriedade de rede,
-                -- anulando a capacidade do exploit de movimentar o alvo livremente.
-                for _, part in ipairs(Workspace:GetDescendants()) do
-                    if part:IsA("BasePart") and not part.Anchored and not part.Locked then
-                        local isCharPart = false
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p.Character and part:IsDescendantOf(p.Character) then
-                                isCharPart = true
-                                break
-                            end
-                        end
-                        if not isCharPart and (part.Position - targetRoot.Position).Magnitude < 50 then
-                            part.AssemblyLinearVelocity = (targetRoot.Position - part.Position) * 100
-                            part.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
-                        end
-                    end
-                end
             end)
-        end
-    else
-        if #guardConstraints > 0 then
-            clearGuardConstraints()
-            lastGuardedChar = nil
         end
     end
 end)
@@ -740,7 +682,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- PROTEÇÃO TOTAL (Anti-Fling + Anti-Void + Imunidade a Dano/Queda)
+-- PROTEÇÃO TOTAL (Anti-Fling + Anti-Void + Imunidade a Dano/Queda para você nunca morrer)
 RunService.Stepped:Connect(function()
     if not antiFlingActive then return end
     
@@ -772,18 +714,6 @@ RunService.Stepped:Connect(function()
         if not flingActive and not guardActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
-        end
-    end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local otherRoot = player.Character:FindFirstChild("HumanoidRootPart")
-            if otherRoot and (otherRoot.AssemblyLinearVelocity.Magnitude > 250 or otherRoot.AssemblyAngularVelocity.Magnitude > 250) then
-                pcall(function()
-                    otherRoot.AssemblyLinearVelocity = Vector3.zero
-                    otherRoot.AssemblyAngularVelocity = Vector3.zero
-                end)
-            end
         end
     end
 end)
@@ -951,7 +881,7 @@ task.spawn(function()
     end
 end)
 
--- Loop Fling Dinâmico
+-- Loop Fling Dinâmico (Corrigido o erro do startTag)
 task.spawn(function()
     while true do
         if not flingActive or guardActive then
@@ -977,20 +907,14 @@ task.spawn(function()
                 end
             end)
 
-            if scriptFightActive then
-                rootPart.CFrame = targetRoot.CFrame + Vector3.new(0, 1, 0)
-                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-99999, 99999), 85000, math.random(-99999, 99999))
-                rootPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
-            else
-                local randomOffset = CFrame.new(
-                    math.random(-100, 100) / 100, 
-                    math.random(-50, 50) / 100, 
-                    math.random(-100, 100) / 100
-                )
-                rootPart.CFrame = targetRoot.CFrame * randomOffset
-                rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-30000, 30000), math.random(30000, 50000), math.random(-30000, 30000))
-                rootPart.AssemblyAngularVelocity = Vector3.new(999999, 999999, 999999)
-            end
+            local randomOffset = CFrame.new(
+                math.random(-100, 100) / 100, 
+                math.random(-50, 50) / 100, 
+                math.random(-100, 100) / 100
+            )
+            rootPart.CFrame = targetRoot.CFrame * randomOffset
+            rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-30000, 30000), math.random(30000, 50000), math.random(-30000, 30000))
+            rootPart.AssemblyAngularVelocity = Vector3.new(999999, 999999, 999999)
         end
 
         if todosActive then
