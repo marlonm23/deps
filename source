@@ -1,508 +1,757 @@
 --[[
-    Custom Script Hub - Versão 2.5
-    Atualizado com Toggle "Todos" + Filtro Dinâmico e Flight nos Alvos
-]]--
+    Script: Mass Walkfling + Jogar Blocos Pretos + Inimigos JSON + Anti-Fling + Auto-Rejoin (Bypass Perfil Fechado)
+--]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
-
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Remove GUI anterior se já existir
-if PlayerGui:FindFirstChild("CustomHubGui") then
-    PlayerGui.CustomHubGui:Destroy()
-end
-
--- Variáveis de Estado
-local Config = {
-    AutoUpdate = true,
-    UpdateUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source",
-    Immunity = false,
-    Fly = false,
-    FlyOthers = false,
-    FlySpeed = 50,
-    TargetAll = true, -- ON = Todos | OFF = Nome digitado
-    TargetQuery = "",
-    ScriptCombatActive = false
+local savedConfig = _G.MassFlingConfig or {
+    flingActive = false,
+    todosActive = false,
+    antiFlingActive = false,
+    invisibleActive = false,
+    throwPartsActive = false,
+    targetText = ""
 }
 
--- Criação da Interface Gráfica (GUI)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "CustomHubGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
+local flingActive = savedConfig.flingActive
+local todosActive = savedConfig.todosActive
+local antiFlingActive = savedConfig.antiFlingActive
+local invisibleActive = savedConfig.invisibleActive
+local throwPartsActive = savedConfig.throwPartsActive
 
--- Janela Principal
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 520, 0, 390)
-MainFrame.Position = UDim2.new(0.5, -260, 0.5, -195)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+local preTeleportPos = nil
+local scriptUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/source"
+local jsonUrl = "https://raw.githubusercontent.com/marlonm23/deps/refs/heads/main/id"
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
+local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 
--- Barra Superior
-local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, 0, 0, 40)
-TopBar.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
-TopBar.BorderSizePixel = 0
-TopBar.Parent = MainFrame
+local function saveStateAndTeleport(teleportFunction)
+    if queueteleport then
+        local targetVal = targetBox and targetBox.Text or savedConfig.targetText
+        
+        local codeToQueue = string.format([[
+            _G.MassFlingConfig = {
+                flingActive = %s,
+                todosActive = %s,
+                antiFlingActive = %s,
+                invisibleActive = %s,
+                throwPartsActive = %s,
+                targetText = %q
+            }
+            loadstring(game:HttpGet(%q))()
+        ]], 
+        tostring(flingActive), tostring(todosActive), tostring(antiFlingActive), 
+        tostring(invisibleActive), tostring(throwPartsActive), targetVal, scriptUrl)
 
-local TopBarCorner = Instance.new("UICorner")
-TopBarCorner.CornerRadius = UDim.new(0, 8)
-TopBarCorner.Parent = TopBar
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -40, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
-Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 16
-Title.Font = Enum.Font.GothamBold
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Text = "⚡ EXPLOIT COMBAT HUB [v2.5]"
-Title.Parent = TopBar
-
--- Botão Fechar
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -35, 0, 5)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.TextSize = 14
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Text = "X"
-CloseBtn.Parent = TopBar
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 6)
-CloseCorner.Parent = CloseBtn
-
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
-
--- Sistema de Abas
-local TabContainer = Instance.new("Frame")
-TabContainer.Size = UDim2.new(0, 130, 1, -50)
-TabContainer.Position = UDim2.new(0, 10, 0, 45)
-TabContainer.BackgroundTransparency = 1
-TabContainer.Parent = MainFrame
-
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 8)
-UIListLayout.Parent = TabContainer
-
-local PagesContainer = Instance.new("Folder")
-PagesContainer.Name = "Pages"
-PagesContainer.Parent = MainFrame
-
-local function createPage(name)
-    local page = Instance.new("ScrollingFrame")
-    page.Name = name
-    page.Size = UDim2.new(1, -155, 1, -55)
-    page.Position = UDim2.new(0, 145, 0, 48)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 4
-    page.Visible = false
-    page.Parent = PagesContainer
-    return page
+        pcall(function()
+            queueteleport(codeToQueue)
+        end)
+    end
+    teleportFunction()
 end
 
-local Page1 = createPage("Principal")
-local Page2 = createPage("ScriptVsScript")
-local Page3 = createPage("Configuracoes")
+if PlayerGui:FindFirstChild("MassFlingUI") then
+    PlayerGui.MassFlingUI:Destroy()
+end
 
-Page1.Visible = true
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MassFlingUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
 
-local function createTabButton(text, targetPage, order)
+-- Janela Principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 230, 0, 380)
+mainFrame.Position = UDim2.new(0, 50, 0, 50)
+mainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+
+-- Topbar
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 10)
+
+local fixCover = Instance.new("Frame")
+fixCover.Size = UDim2.new(1, 0, 0, 5)
+fixCover.Position = UDim2.new(0, 0, 1, -5)
+fixCover.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+fixCover.BorderSizePixel = 0
+fixCover.Parent = topBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 1, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
+titleLabel.TextSize = 12
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.Text = "⚡ Hub Inimigos & Tracker"
+titleLabel.Parent = topBar
+
+-- Sistema de Abas
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, -16, 0, 28)
+tabContainer.Position = UDim2.new(0, 8, 0, 38)
+tabContainer.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+tabContainer.BorderSizePixel = 0
+tabContainer.Parent = mainFrame
+Instance.new("UICorner", tabContainer).CornerRadius = UDim.new(0, 6)
+
+local tab1Btn = Instance.new("TextButton")
+tab1Btn.Size = UDim2.new(0.5, -2, 1, 0)
+tab1Btn.Position = UDim2.new(0, 0, 0, 0)
+tab1Btn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tab1Btn.TextSize = 11
+tab1Btn.Font = Enum.Font.SourceSansBold
+tab1Btn.Text = "Controles"
+tab1Btn.Parent = tabContainer
+Instance.new("UICorner", tab1Btn).CornerRadius = UDim.new(0, 6)
+
+local tab2Btn = Instance.new("TextButton")
+tab2Btn.Size = UDim2.new(0.5, -2, 1, 0)
+tab2Btn.Position = UDim2.new(0.5, 2, 0, 0)
+tab2Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+tab2Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
+tab2Btn.TextSize = 11
+tab2Btn.Font = Enum.Font.SourceSansBold
+tab2Btn.Text = "Inimigos JSON"
+tab2Btn.Parent = tabContainer
+Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 6)
+
+-- Containers
+local tab1Content = Instance.new("ScrollingFrame")
+tab1Content.Size = UDim2.new(1, -16, 1, -78)
+tab1Content.Position = UDim2.new(0, 8, 0, 72)
+tab1Content.BackgroundTransparency = 1
+tab1Content.BorderSizePixel = 0
+tab1Content.CanvasSize = UDim2.new(0, 0, 0, 280)
+tab1Content.ScrollBarThickness = 3
+tab1Content.Visible = true
+tab1Content.Parent = mainFrame
+
+local tab2Content = Instance.new("Frame")
+tab2Content.Size = UDim2.new(1, -16, 1, -78)
+tab2Content.Position = UDim2.new(0, 8, 0, 72)
+tab2Content.BackgroundTransparency = 1
+tab2Content.Visible = false
+tab2Content.Parent = mainFrame
+
+tab1Btn.MouseButton1Click:Connect(function()
+    tab1Content.Visible = true
+    tab2Content.Visible = false
+    tab1Btn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+    tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab2Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    tab2Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
+end)
+
+tab2Btn.MouseButton1Click:Connect(function()
+    tab1Content.Visible = false
+    tab2Content.Visible = true
+    tab2Btn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+    tab2Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab1Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    tab1Btn.TextColor3 = Color3.fromRGB(160, 160, 170)
+end)
+
+local function createButton(parent, text, posY, color)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.TextSize = 13
-    btn.Font = Enum.Font.GothamMedium
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.Position = UDim2.new(0, 0, 0, posY)
+    btn.BackgroundColor3 = color or Color3.fromRGB(45, 45, 52)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.SourceSansBold
     btn.Text = text
-    btn.LayoutOrder = order
-    btn.Parent = TabContainer
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-
-    btn.MouseButton1Click:Connect(function()
-        for _, p in pairs(PagesContainer:GetChildren()) do
-            p.Visible = false
-        end
-        targetPage.Visible = true
-    end)
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     return btn
 end
 
-createTabButton("Principal", Page1, 1)
-createTabButton("Script vs Script", Page2, 2)
-createTabButton("Configurações", Page3, 3)
+local flingButton = createButton(tab1Content, flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO", 0, flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local todosButton = createButton(tab1Content, todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO", 36, todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local antiFlingButton = createButton(tab1Content, antiFlingActive and "Anti-Fling: ON" or "Anti-Fling: OFF", 72, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local invisibleButton = createButton(tab1Content, invisibleActive and "Invisível: ON" or "Invisível: OFF", 108, invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 144, Color3.fromRGB(90, 60, 180))
 
--- Função auxiliar para criar botões de toggle com estado inicial opcional
-local function createToggle(parent, text, defaultState, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -10, 0, 38)
-    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-    frame.Parent = parent
+local targetBox = Instance.new("TextBox")
+targetBox.Size = UDim2.new(1, 0, 0, 30)
+targetBox.Position = UDim2.new(0, 0, 0, 180)
+targetBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+targetBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
+targetBox.PlaceholderText = "Nome do Alvo (Fling/Blocos)..."
+targetBox.Text = savedConfig.targetText or ""
+targetBox.TextSize = 12
+targetBox.Font = Enum.Font.SourceSans
+targetBox.Visible = not todosActive
+targetBox.Parent = tab1Content
+Instance.new("UICorner", targetBox).CornerRadius = UDim.new(0, 6)
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = frame
+targetBox:GetPropertyChangedSignal("Text"):Connect(function()
+    savedConfig.targetText = targetBox.Text
+end)
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -60, 1, 0)
-    label.Position = UDim2.new(0, 12, 0, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.TextSize = 13
-    label.Font = Enum.Font.Gotham
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = text
-    label.Parent = frame
+local throwPartsButton = createButton(tab1Content, throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF", 216, throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 252, Color3.fromRGB(40, 130, 90))
 
-    local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0, 40, 0, 22)
-    toggleBtn.Position = UDim2.new(1, -48, 0.5, -11)
-    toggleBtn.BackgroundColor3 = defaultState and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)
-    toggleBtn.Text = ""
-    toggleBtn.Parent = frame
+-- ELEMENTOS ABA 2 (Inimigos JSON com Filtro e Botões de Localizar)
+local filterBox = Instance.new("TextBox")
+filterBox.Size = UDim2.new(1, 0, 0, 28)
+filterBox.Position = UDim2.new(0, 0, 0, 0)
+filterBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+filterBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+filterBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 140)
+filterBox.PlaceholderText = "🔍 Filtrar inimigo por nome..."
+filterBox.Text = ""
+filterBox.TextSize = 11
+filterBox.Font = Enum.Font.SourceSans
+filterBox.Parent = tab2Content
+Instance.new("UICorner", filterBox).CornerRadius = UDim.new(0, 6)
 
-    local tCorner = Instance.new("UICorner")
-    tCorner.CornerRadius = UDim.new(1, 0)
-    tCorner.Parent = toggleBtn
+local enemiesScroll = Instance.new("ScrollingFrame")
+enemiesScroll.Size = UDim2.new(1, 0, 1, -35)
+enemiesScroll.Position = UDim2.new(0, 0, 0, 35)
+enemiesScroll.BackgroundTransparency = 1
+enemiesScroll.BorderSizePixel = 0
+enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+enemiesScroll.ScrollBarThickness = 3
+enemiesScroll.Parent = tab2Content
 
-    local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(0, 18, 0, 18)
-    circle.Position = defaultState and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
-    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    circle.Parent = toggleBtn
+local uiList = Instance.new("UIListLayout")
+uiList.SortOrder = Enum.SortOrder.LayoutOrder
+uiList.Padding = UDim.new(0, 4)
+uiList.Parent = enemiesScroll
 
-    local cCorner = Instance.new("UICorner")
-    cCorner.CornerRadius = UDim.new(1, 0)
-    cCorner.Parent = circle
+local statusCsvLabel = Instance.new("TextLabel")
+statusCsvLabel.Size = UDim2.new(1, 0, 0, 25)
+statusCsvLabel.BackgroundTransparency = 1
+statusCsvLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+statusCsvLabel.TextSize = 11
+statusCsvLabel.Font = Enum.Font.SourceSansBold
+statusCsvLabel.Text = "🔄 Baixando JSON do GitHub..."
+statusCsvLabel.Parent = enemiesScroll
 
-    local active = defaultState
-    toggleBtn.MouseButton1Click:Connect(function()
-        active = not active
-        if active then
-            TweenService:Create(toggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 170, 255)}):Play()
-            TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(1, -20, 0.5, -9)}):Play()
-        else
-            TweenService:Create(toggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
-            TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -9)}):Play()
+local function trackAndTeleport(userId, btnLabel)
+    if btnLabel.Text:find("Buscando") then return end
+
+    local originalText = "Localizar"
+    btnLabel.Text = "🔄 Buscando..."
+    btnLabel.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
+
+    task.defer(function()
+        local inCurrentServer = Players:GetPlayerByUserId(userId)
+        if inCurrentServer then
+            btnLabel.Text = "✨ Já está aqui!"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+            task.wait(1.5)
+            btnLabel.Text = originalText
+            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+            return
         end
-        callback(active)
-    end)
-    return frame
-end
 
-local UIListPage1 = Instance.new("UIListLayout")
-UIListPage1.SortOrder = Enum.SortOrder.LayoutOrder
-UIListPage1.Padding = UDim.new(0, 6)
-UIListPage1.Parent = Page1
+        local reqFunc = (syn and syn.request) or (http and http.request) or request or http_request
+        if not reqFunc then
+            btnLabel.Text = "❌ Sem HTTP"
+            task.wait(2)
+            btnLabel.Text = originalText
+            btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+            return
+        end
 
-local UIListPage2 = Instance.new("UIListLayout")
-UIListPage2.SortOrder = Enum.SortOrder.LayoutOrder
-UIListPage2.Padding = UDim.new(0, 6)
-UIListPage2.Parent = Page2
+        local success, res = pcall(function()
+            local body = HttpService:JSONEncode({ userIds = { userId } })
+            return reqFunc({
+                Url = "https://presence.roproxy.com/v1/presence/users",
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body
+            })
+        end)
 
-local UIListPage3 = Instance.new("UIListLayout")
-UIListPage3.SortOrder = Enum.SortOrder.LayoutOrder
-UIListPage3.Padding = UDim.new(0, 6)
-UIListPage3.Parent = Page3
+        if success and res and res.Body then
+            local decodeOk, responseData = pcall(function()
+                return HttpService:JSONDecode(res.Body)
+            end)
 
--- ==========================================
--- ABA 1: PRINCIPAL
--- ==========================================
-
--- Campo de Digitação (só fica ativo quando "Todos" está OFF)
-local NameInputFrame = Instance.new("Frame")
-NameInputFrame.Size = UDim2.new(1, -10, 0, 42)
-NameInputFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-NameInputFrame.Visible = false -- Começa oculto pois "Todos" começa ON
-NameInputFrame.Parent = Page1
-
-local NameCorner = Instance.new("UICorner")
-NameCorner.CornerRadius = UDim.new(0, 6)
-NameCorner.Parent = NameInputFrame
-
-local TargetInput = Instance.new("TextBox")
-TargetInput.Size = UDim2.new(1, -16, 0, 28)
-TargetInput.Position = UDim2.new(0, 8, 0.5, -14)
-TargetInput.BackgroundColor3 = Color3.fromRGB(38, 38, 48)
-TargetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-TargetInput.TextSize = 12
-TargetInput.Font = Enum.Font.Gotham
-TargetInput.PlaceholderText = "Digite o nome (ou parte do nome) do jogador..."
-TargetInput.Text = ""
-TargetInput.Parent = NameInputFrame
-
-local TargetInputCorner = Instance.new("UICorner")
-TargetInputCorner.CornerRadius = UDim.new(0, 4)
-TargetInputCorner.Parent = TargetInput
-
-TargetInput:GetPropertyChangedSignal("Text"):Connect(function()
-    Config.TargetQuery = TargetInput.Text:lower()
-end)
-
--- Toggle "Alvo: Todos" (ON = Todos | OFF = Digitar Nome)
-createToggle(Page1, "Alvo: Todos (OFF = Digitar Nome)", true, function(state)
-    Config.TargetAll = state
-    NameInputFrame.Visible = not state
-end)
-
--- Função de Identificação de Alvos
-local function getFilteredPlayers()
-    local list = {}
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            if Config.TargetAll then
-                table.insert(list, p)
-            else
-                if Config.TargetQuery ~= "" and (string.find(p.Name:lower(), Config.TargetQuery) or string.find(p.DisplayName:lower(), Config.TargetQuery)) then
-                    table.insert(list, p)
+            if decodeOk and responseData and responseData.userPresences and responseData.userPresences[1] then
+                local presence = responseData.userPresences[1]
+                if presence.userPresenceType == 2 and presence.gameId and presence.gameId ~= "" then
+                    btnLabel.Text = "🚀 Entrando..."
+                    btnLabel.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+                    saveStateAndTeleport(function()
+                        TeleportService:TeleportToPlaceInstance(presence.placeId or game.PlaceId, presence.gameId, LocalPlayer)
+                    end)
+                    return
                 end
             end
         end
-    end
-    return list
+
+        local fallbackSuccess, fallbackRes = pcall(function()
+            return reqFunc({
+                Url = string.format("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png&isCircular=false", userId),
+                Method = "GET"
+            })
+        end)
+
+        if fallbackSuccess then
+            btnLabel.Text = "🔒 Perfil Restrito"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 80, 40)
+        else
+            btnLabel.Text = "⚠️ Inalcançável"
+            btnLabel.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        end
+
+        task.wait(2.5)
+        btnLabel.Text = originalText
+        btnLabel.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+    end)
 end
 
--- Imunidade On/Off
-createToggle(Page1, "Imunidade (Godmode / Anti-Dano)", false, function(state)
-    Config.Immunity = state
+local enemiesList = {}
+
+local function loadEnemiesJSON()
+    task.defer(function()
+        local success, rawData = pcall(function()
+            return game:HttpGet(jsonUrl)
+        end)
+
+        if not success or not rawData then
+            statusCsvLabel.Text = "❌ Erro ao baixar JSON!"
+            statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+            enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
+            return
+        end
+
+        local decodeSuccess, decodedData = pcall(function()
+            return HttpService:JSONDecode(rawData)
+        end)
+
+        if not decodeSuccess or not decodedData then
+            statusCsvLabel.Text = "❌ Erro ao decodificar JSON!"
+            statusCsvLabel.TextColor3 = Color3.fromRGB(220, 100, 100)
+            enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, 30)
+            return
+        end
+
+        statusCsvLabel:Destroy()
+
+        for _, entry in ipairs(decodedData) do
+            if entry.name and entry.id then
+                table.insert(enemiesList, { name = tostring(entry.name), id = tonumber(entry.id) })
+            end
+        end
+
+        if #enemiesList == 0 then
+            local emptyLbl = Instance.new("TextLabel")
+            emptyLbl.Size = UDim2.new(1, 0, 0, 30)
+            emptyLbl.BackgroundTransparency = 1
+            emptyLbl.TextColor3 = Color3.fromRGB(220, 180, 100)
+            emptyLbl.TextSize = 11
+            emptyLbl.Font = Enum.Font.SourceSans
+            emptyLbl.Text = "Nenhum inimigo encontrado!"
+            emptyLbl.Parent = enemiesScroll
+            return
+        end
+
+        for _, enemy in ipairs(enemiesList) do
+            local row = Instance.new("Frame")
+            row.Name = enemy.name
+            row.Size = UDim2.new(1, 0, 0, 26)
+            row.BackgroundTransparency = 1
+            row.Parent = enemiesScroll
+
+            local nameLbl = Instance.new("TextLabel")
+            nameLbl.Size = UDim2.new(0.6, 0, 1, 0)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.TextColor3 = Color3.fromRGB(230, 230, 240)
+            nameLbl.TextSize = 11
+            nameLbl.Font = Enum.Font.SourceSansBold
+            nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nameLbl.Text = " " .. enemy.name
+            nameLbl.Parent = row
+
+            local locBtn = Instance.new("TextButton")
+            locBtn.Size = UDim2.new(0.4, 0, 1, 0)
+            locBtn.Position = UDim2.new(0.6, 0, 0, 0)
+            locBtn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+            locBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            locBtn.TextSize = 11
+            locBtn.Font = Enum.Font.SourceSansBold
+            locBtn.Text = "Localizar"
+            locBtn.Parent = row
+            Instance.new("UICorner", locBtn).CornerRadius = UDim.new(0, 5)
+
+            locBtn.MouseButton1Click:Connect(function()
+                trackAndTeleport(enemy.id, locBtn)
+            end)
+        end
+
+        enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, #enemiesList * 30)
+    end)
+end
+
+filterBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = filterBox.Text:lower()
+    local visibleCount = 0
+
+    for _, child in ipairs(enemiesScroll:GetChildren()) do
+        if child:IsA("Frame") then
+            local enemyName = child.Name:lower()
+            if query == "" or enemyName:find(query) then
+                child.Visible = true
+                visibleCount = visibleCount + 1
+            else
+                child.Visible = false
+            end
+        end
+    end
+    enemiesScroll.CanvasSize = UDim2.new(0, 0, 0, visibleCount * 30)
+end)
+
+loadEnemiesJSON()
+
+flingButton.MouseButton1Click:Connect(function()
+    flingActive = not flingActive
+    flingButton.Text = flingActive and "Fling: ATIVADO" or "Fling: DESATIVADO"
+    flingButton.BackgroundColor3 = flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
+end)
+
+todosButton.MouseButton1Click:Connect(function()
+    todosActive = not todosActive
+    todosButton.Text = todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO"
+    todosButton.BackgroundColor3 = todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
+    targetBox.Visible = not todosActive
+end)
+
+antiFlingButton.MouseButton1Click:Connect(function()
+    antiFlingActive = not antiFlingActive
+    antiFlingButton.Text = antiFlingActive and "Anti-Fling: ON" or "Anti-Fling: OFF"
+    antiFlingButton.BackgroundColor3 = antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
+end)
+
+invisibleButton.MouseButton1Click:Connect(function()
+    invisibleActive = not invisibleActive
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = invisibleActive and 1 or (part.Name == "HumanoidRootPart" and 1 or 0)
+            end
+        end
+    end
+    invisibleButton.Text = invisibleActive and "Invisível: ON" or "Invisível: OFF"
+    invisibleButton.BackgroundColor3 = invisibleActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
+end)
+
+throwPartsButton.MouseButton1Click:Connect(function()
+    throwPartsActive = not throwPartsActive
+    throwPartsButton.Text = throwPartsActive and "Jogar Blocos: ON" or "Jogar Blocos: OFF"
+    throwPartsButton.BackgroundColor3 = throwPartsActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
+end)
+
+rejoinButton.MouseButton1Click:Connect(function()
+    rejoinButton.Text = "Reconectando..."
+    rejoinButton.BackgroundColor3 = Color3.fromRGB(150, 100, 50)
+    saveStateAndTeleport(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    end)
+end)
+
+returnButton.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root and preTeleportPos then
+        root.CFrame = preTeleportPos
+    end
+end)
+
+local lastPos = nil
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        if lastPos then
+            local dist = (root.Position - lastPos).Magnitude
+            if dist > 40 then
+                preTeleportPos = CFrame.new(lastPos)
+            end
+        end
+        lastPos = root.Position
+    end
+end)
+
+local function getTargetPlayer()
+    local query = targetBox.Text:lower()
+    if query == "" then return nil end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local pName, pDisp = player.Name:lower(), player.DisplayName:lower()
+            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
+                return player
+            end
+        end
+    end
+    return nil
+end
+
+local function isValidTarget(targetChar)
+    if not targetChar then return false end
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    return targetRoot ~= nil
+end
+
+-- AUTO-REJOIN SEGURO PARA ALVO DIGITADO
+task.spawn(function()
+    task.wait(8)
+    while true do
+        task.wait(3.0)
+        pcall(function()
+            if (flingActive or throwPartsActive) and not todosActive then
+                local query = targetBox.Text:lower()
+                if query ~= "" and #query >= 2 then
+                    local targetInServer = false
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer then
+                            local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                            if pName:sub(1, #query) == query or pDisp:sub(1, #query) == query or pName:find(query) or pDisp:find(query) then
+                                targetInServer = true
+                                break
+                            end
+                        end
+                    end
+
+                    if not targetInServer then
+                        task.wait(3.0)
+                        local currentQuery = targetBox.Text:lower()
+                        if currentQuery == query then
+                            local doubleCheck = false
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p ~= LocalPlayer then
+                                    local pName, pDisp = p.Name:lower(), p.DisplayName:lower()
+                                    if pName:sub(1, #currentQuery) == currentQuery or pDisp:sub(1, #currentQuery) == currentQuery or pName:find(currentQuery) or pDisp:find(currentQuery) then
+                                        doubleCheck = true
+                                        break
+                                    end
+                                end
+                            end
+
+                            if not doubleCheck then
+                                saveStateAndTeleport(function()
+                                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                                end)
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ANTI-FLING
+RunService.Heartbeat:Connect(function()
+    if throwPartsActive or flingActive then
+        pcall(function()
+            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
+        end)
+    end
 end)
 
 RunService.Stepped:Connect(function()
-    if Config.Immunity and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = LocalPlayer.Character.Humanoid.MaxHealth
-        if LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0, LocalPlayer.Character.HumanoidRootPart.Velocity.Y, 0)
-        end
-    end
-end)
-
--- WalkFlight Próprio On/Off
-local flightConnection
-local bodyVel, bodyGyro
-
-createToggle(Page1, "WalkFlight (Voo Próprio)", false, function(state)
-    Config.Fly = state
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    if not antiFlingActive then return end
     
-    if Config.Fly then
-        bodyVel = Instance.new("BodyVelocity")
-        bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bodyVel.Velocity = Vector3.new(0, 0, 0)
-        bodyVel.Parent = char.HumanoidRootPart
-
-        bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        bodyGyro.CFrame = char.HumanoidRootPart.CFrame
-        bodyGyro.Parent = char.HumanoidRootPart
-
-        flightConnection = RunService.RenderStepped:Connect(function()
-            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-            local cam = workspace.CurrentCamera
-            local moveDir = Vector3.new(0, 0, 0)
-            
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
-
-            bodyVel.Velocity = moveDir * Config.FlySpeed
-            bodyGyro.CFrame = cam.CFrame
-        end)
-    else
-        if flightConnection then flightConnection:Disconnect() end
-        if bodyVel then bodyVel:Destroy() end
-        if bodyGyro then bodyGyro:Destroy() end
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if root and (root.AssemblyLinearVelocity.Magnitude > 300 or root.AssemblyAngularVelocity.Magnitude > 300) then
+        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     end
-end)
 
--- Novo: Dar Flight nos Outros (Aplica sustentação/levitação nos alvos)
-createToggle(Page1, "Dar Flight nos Outros (Levitar Alvos)", false, function(state)
-    Config.FlyOthers = state
-    if not state then
-        -- Limpa forças aplicadas quando desligado
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local existing = p.Character.HumanoidRootPart:FindFirstChild("TargetFlightForce")
-                if existing then existing:Destroy() end
-            end
-        end
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if Config.FlyOthers then
-        local targets = getFilteredPlayers()
-        for _, target in pairs(targets) do
-            pcall(function()
-                if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    local hrp = target.Character.HumanoidRootPart
-                    local bv = hrp:FindFirstChild("TargetFlightForce")
-                    if not bv then
-                        bv = Instance.new("BodyVelocity")
-                        bv.Name = "TargetFlightForce"
-                        bv.MaxForce = Vector3.new(0, math.huge, 0)
-                        bv.Parent = hrp
-                    end
-                    -- Faz o alvo flutuar e subir suavemente controlado pela direção da câmera ou altura fixa
-                    bv.Velocity = Vector3.new(0, 15, 0)
-                end
-            end)
-        end
-    end
-end)
-
--- Botão de Rejoin
-local RejoinFrame = Instance.new("Frame")
-RejoinFrame.Size = UDim2.new(1, -10, 0, 38)
-RejoinFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-RejoinFrame.Parent = Page1
-
-local RejoinCorner = Instance.new("UICorner")
-RejoinCorner.CornerRadius = UDim.new(0, 6)
-RejoinCorner.Parent = RejoinFrame
-
-local RejoinBtn = Instance.new("TextButton")
-RejoinBtn.Size = UDim2.new(1, 0, 1, 0)
-RejoinBtn.BackgroundTransparency = 1
-RejoinBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-RejoinBtn.TextSize = 13
-RejoinBtn.Font = Enum.Font.GothamBold
-RejoinBtn.Text = "🔄 Reconectar (Rejoin Server)"
-RejoinBtn.Parent = RejoinFrame
-
-RejoinBtn.MouseButton1Click:Connect(function()
-    pcall(function()
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
-    end)
-end)
-
-
--- ==========================================
--- ABA 2: SCRIPT VS SCRIPT (Combate contra Scripts)
--- ==========================================
-
-local ScriptVsScriptDesc = Instance.new("TextLabel")
-ScriptVsScriptDesc.Size = UDim2.new(1, -10, 0, 45)
-ScriptVsScriptDesc.BackgroundTransparency = 1
-ScriptVsScriptDesc.TextColor3 = Color3.fromRGB(170, 170, 170)
-ScriptVsScriptDesc.TextSize = 11
-ScriptVsScriptDesc.Font = Enum.Font.Gotham
-ScriptVsScriptDesc.TextWrapped = true
-ScriptVsScriptDesc.TextXAlignment = Enum.TextXAlignment.Left
-ScriptVsScriptDesc.Text = "Usa o mesmo filtro da aba Principal (Todos ON ou Nome digitado). Neutraliza voos, noclips e física de outros scripts."
-ScriptVsScriptDesc.Parent = Page2
-
-createToggle(Page2, "Ativar Anulação de Script (Anti-Script Lock)", false, function(state)
-    Config.ScriptCombatActive = state
-end)
-
-RunService.Heartbeat:Connect(function()
-    if Config.ScriptCombatActive then
-        local targets = getFilteredPlayers()
-        for _, target in pairs(targets) do
-            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                local hrp = target.Character.HumanoidRootPart
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local otherRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            if otherRoot and (otherRoot.AssemblyLinearVelocity.Magnitude > 250 or otherRoot.AssemblyAngularVelocity.Magnitude > 250) then
                 pcall(function()
-                    for _, v in pairs(hrp:GetChildren()) do
-                        if (v:IsA("BodyVelocity") or v:IsA("BodyPosition") or v:IsA("LinearVelocity")) and v.Name ~= "TargetFlightForce" then
-                            v.Velocity = Vector3.new(0, -500, 0)
-                        end
-                    end
+                    otherRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    otherRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                 end)
             end
         end
     end
 end)
 
-local AnchorFrame = Instance.new("Frame")
-AnchorFrame.Size = UDim2.new(1, -10, 0, 38)
-AnchorFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-AnchorFrame.Parent = Page2
+-- Loop de Arremesso Direto e Contínuo dos Blocos Pretos da Lava
+task.spawn(function()
+    while true do
+        if not throwPartsActive then
+            task.wait(0.2)
+            continue
+        end
 
-local AnchorCorner = Instance.new("UICorner")
-AnchorCorner.CornerRadius = UDim.new(0, 6)
-AnchorCorner.Parent = AnchorFrame
-
-local AnchorBtn = Instance.new("TextButton")
-AnchorBtn.Size = UDim2.new(1, 0, 1, 0)
-AnchorBtn.BackgroundTransparency = 1
-AnchorBtn.TextColor3 = Color3.fromRGB(255, 200, 0)
-AnchorBtn.TextSize = 13
-AnchorBtn.Font = Enum.Font.GothamBold
-AnchorBtn.Text = "⚡ Desestabilizar Inimigos (Anchor Burst)"
-AnchorBtn.Parent = AnchorFrame
-
-AnchorBtn.MouseButton1Click:Connect(function()
-    local targets = getFilteredPlayers()
-    for _, target in pairs(targets) do
-        pcall(function()
-            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                target.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, 5000, 0)
+        local targetChar = nil
+        if todosActive then
+            local validPlayers = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and isValidTarget(p.Character) then
+                    table.insert(validPlayers, p.Character)
+                end
             end
-        end)
+            if #validPlayers > 0 then
+                targetChar = validPlayers[math.random(1, #validPlayers)]
+            end
+        else
+            local targetPlayer = getTargetPlayer()
+            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+                targetChar = targetPlayer.Character
+            end
+        end
+
+        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+            local targetRoot = targetChar.HumanoidRootPart
+            
+            for _, part in ipairs(Workspace:GetDescendants()) do
+                if not throwPartsActive then break end
+                
+                if part:IsA("BasePart") and not part.Anchored then
+                    local color = part.Color
+                    local isBlack = color.R < 0.18 and color.G < 0.18 and color.B < 0.18
+                    
+                    if isBlack then
+                        local isCharacterPart = false
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p.Character and part:IsDescendantOf(p.Character) then
+                                isCharacterPart = true
+                                break
+                            end
+                        end
+
+                        if not isCharacterPart then
+                            pcall(function()
+                                part.CanCollide = true
+                                part.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 1, 1, 1)
+                                
+                                local direction = (targetRoot.Position - part.Position).Unit
+                                part.AssemblyLinearVelocity = direction * 450 + Vector3.new(0, 80, 0)
+                                part.AssemblyAngularVelocity = Vector3.new(4000, 4000, 4000)
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.02)
     end
 end)
 
-
--- ==========================================
--- ABA 3: CONFIGURAÇÕES & ATUALIZAÇÃO
--- ==========================================
-
-createToggle(Page3, "Atualização Automática (Auto-Update)", true, function(state)
-    Config.AutoUpdate = state
-end)
-
-local UpdateFrame = Instance.new("Frame")
-UpdateFrame.Size = UDim2.new(1, -10, 0, 38)
-UpdateFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-UpdateFrame.Parent = Page3
-
-local UpdateCorner = Instance.new("UICorner")
-UpdateCorner.CornerRadius = UDim.new(0, 6)
-UpdateCorner.Parent = UpdateFrame
-
-local UpdateBtn = Instance.new("TextButton")
-UpdateBtn.Size = UDim2.new(1, 0, 1, 0)
-UpdateBtn.BackgroundTransparency = 1
-UpdateBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
-UpdateBtn.TextSize = 13
-UpdateBtn.Font = Enum.Font.GothamBold
-UpdateBtn.Text = "📥 Recarregar / Atualizar Script Agora"
-UpdateBtn.Parent = UpdateFrame
-
-UpdateBtn.MouseButton1Click:Connect(function()
-    pcall(function()
-        if Config.AutoUpdate then
-            ScreenGui:Destroy()
-            loadstring(game:HttpGet(Config.UpdateUrl))()
+-- Loop Fling Padrão
+task.spawn(function()
+    while true do
+        if not flingActive then
+            task.wait(0.2)
+            continue
         end
-    end)
-end)
 
-print("⚡ Script Customizado v2.5 carregado com sucesso!")
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if not rootPart or not humanoid or humanoid.Health <= 0 then
+            task.wait(0.5)
+            continue
+        end
+
+        if todosActive then
+            local targets = {}
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and isValidTarget(player.Character) then
+                    table.insert(targets, player.Character)
+                end
+            end
+
+            if #targets > 0 then
+                for _, targetChar in ipairs(targets) do
+                    if not flingActive or not todosActive then break end
+                    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                    if targetRoot and isValidTarget(targetChar) then
+                        local startTick = tick()
+                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 0.35) do
+                            character = LocalPlayer.Character
+                            rootPart = character and character:FindFirstChild("HumanoidRootPart")
+                            if not character or not rootPart then break end
+
+                            pcall(function()
+                                targetRoot.CanCollide = true
+                                for _, part in ipairs(targetChar:GetChildren()) do
+                                    if part:IsA("BasePart") then part.CanCollide = true end
+                                end
+                            end)
+
+                            local randomOffset = CFrame.new(
+                                math.random(-100, 100) / 100, 
+                                math.random(-30, 50) / 100, 
+                                math.random(-100, 100) / 100
+                            )
+                            rootPart.CFrame = targetRoot.CFrame * randomOffset
+                            rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+                            rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+
+                            RunService.Heartbeat:Wait()
+                        end
+                    end
+                end
+            else
+                task.wait(0.3)
+            end
+        else
+            local targetPlayer = getTargetPlayer()
+            if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
+                local targetChar = targetPlayer.Character
+                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                
+                if targetRoot then
+                    while flingActive and not todosActive and targetPlayer.Character == targetChar and isValidTarget(targetChar) do
+                        character = LocalPlayer.Character
+                        rootPart = character and character:FindFirstChild("HumanoidRootPart")
+                        if not character or not rootPart then break end
+                        
+                        pcall(function()
+                            targetRoot.CanCollide = true
+                            for _, part in ipairs(targetChar:GetChildren()) do
+                                if part:IsA("BasePart") then part.CanCollide = true end
+                            end
+                        end)
+                        
+                        local randomOffset = CFrame.new(
+                            math.random(-100, 100) / 100, 
+                            math.random(-30, 50) / 100, 
+                            math.random(-100, 100) / 100
+                        )
+                        rootPart.CFrame = targetRoot.CFrame * randomOffset
+                        rootPart.AssemblyLinearVelocity = Vector3.new(50000, 50000, 50000)
+                        rootPart.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                        
+                        RunService.Heartbeat:Wait()
+                    end
+                end
+            else
+                task.wait(0.3)
+            end
+        end
+    end
+end)
