@@ -1,5 +1,5 @@
 --[[
-    Script: Teleporte, Flight & Fling Para Baixo (Void) + Anti-Proteção + Auto Iniciar
+    Script: Teleporte, Flight & Fling Alternativo (CFrame/Spin) + Anti-Proteção + Auto Iniciar
 --]]
 
 local Players = game:GetService("Players")
@@ -106,10 +106,10 @@ titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.Text = "⚡ Hub Teleporte & Flight"
+titleLabel.Text = "⚡ Hub Teleporte & Flight v2"
 titleLabel.Parent = topBar
 
--- Sistema de Abas (2 Abas: Controles & Voo, Auto)
+-- Sistema de Abas
 local tabContainer = Instance.new("Frame")
 tabContainer.Size = UDim2.new(1, -16, 0, 30)
 tabContainer.Position = UDim2.new(0, 8, 0, 40)
@@ -135,7 +135,6 @@ end
 local tab1Btn = createTabButton(0, 0.5, "Controles & Teleporte")
 local tab2Btn = createTabButton(0.5, 0.5, "Auto Iniciar")
 
--- Containers de Conteúdo
 local function createContentContainer(canvasHeight)
     local cont = Instance.new("ScrollingFrame")
     cont.Size = UDim2.new(1, -16, 1, -82)
@@ -194,10 +193,8 @@ local function createButton(parent, text, posY, color)
     return btn
 end
 
--- ==========================================
--- ABA 1: CONTROLES, FLING, FLIGHT E TELEPORTE
--- ==========================================
-local flingButton = createButton(tab1Content, flingActive and "Fling (Baixo): ATIVADO" or "Fling (Baixo): DESATIVADO", 0, flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
+-- ABA 1: CONTROLES
+local flingButton = createButton(tab1Content, flingActive and "Fling (Spin/Void): ATIVADO" or "Fling (Spin/Void): DESATIVADO", 0, flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local todosButton = createButton(tab1Content, todosActive and "Todos: ATIVADO" or "Todos: DESATIVADO", 36, todosActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local flightButton = createButton(tab1Content, flightActive and "Flight (Voo): ON" or "Flight (Voo): OFF", 72, flightActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local antiFlingButton = createButton(tab1Content, antiFlingActive and "Proteção Total: ON" or "Proteção Total: OFF", 108, antiFlingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
@@ -225,9 +222,7 @@ local tpToTargetButton = createButton(tab1Content, "🎯 Teleportar até o Alvo"
 local rejoinButton = createButton(tab1Content, "Rejoin Servidor", 252, Color3.fromRGB(90, 60, 180))
 local returnButton = createButton(tab1Content, "Voltar ao Local Anterior", 288, Color3.fromRGB(40, 130, 90))
 
--- ==========================================
 -- ABA 2: AUTO INICIAR
--- ==========================================
 local autoStartBtn = createButton(tab2Content, autoStartActive and "Auto Pressionar: LIGADO" or "Auto Pressionar: DESLIGADO", 0, autoStartActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50))
 local scanButtonsBtn = createButton(tab2Content, "🔍 Escanear e Pressionar Agora", 36, Color3.fromRGB(45, 120, 220))
 
@@ -240,7 +235,7 @@ statusAutoLabel.TextSize = 10
 statusAutoLabel.Font = Enum.Font.Code
 statusAutoLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusAutoLabel.TextYAlignment = Enum.TextYAlignment.Top
-statusAutoLabel.Text = " Pronto para localizar botões\n de iniciar/jogar..."
+statusAutoLabel.Text = " Pronto para localizar botões..."
 statusAutoLabel.Parent = tab2Content
 Instance.new("UICorner", statusAutoLabel).CornerRadius = UDim.new(0, 6)
 
@@ -274,33 +269,12 @@ local function scanAndPressStartButtons()
 
     for _, gui in ipairs(PlayerGui:GetDescendants()) do
         if gui:IsA("TextButton") or gui:IsA("ImageButton") then
-            local textToCheck = ""
-            if gui:IsA("TextButton") then
-                textToCheck = (gui.Text .. " " .. gui.Name):lower()
-            else
-                textToCheck = gui.Name:lower()
-            end
-
+            local textToCheck = gui:IsA("TextButton") and (gui.Text .. " " .. gui.Name):lower() or gui.Name:lower()
             for _, kw in ipairs(keywords) do
                 if textToCheck:find(kw) and gui.Visible then
                     foundCount = foundCount + 1
                     logText = logText .. " • Clicando GUI: " .. gui.Name .. "\n"
                     simulateClick(gui)
-                    task.wait(0.2)
-                    break
-                end
-            end
-        end
-    end
-
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") or obj:IsA("BasePart") then
-            local nameToCheck = obj.Name:lower()
-            for _, kw in ipairs(keywords) do
-                if nameToCheck:find(kw) then
-                    foundCount = foundCount + 1
-                    logText = logText .. " • Acionando 3D: " .. obj.Name .. "\n"
-                    simulateClick(obj)
                     task.wait(0.2)
                     break
                 end
@@ -315,9 +289,7 @@ local function scanAndPressStartButtons()
     end
 end
 
-scanButtonsBtn.MouseButton1Click:Connect(function()
-    scanAndPressStartButtons()
-end)
+scanButtonsBtn.MouseButton1Click:Connect(scanAndPressStartButtons)
 
 autoStartBtn.MouseButton1Click:Connect(function()
     autoStartActive = not autoStartActive
@@ -329,16 +301,14 @@ task.spawn(function()
     while true do
         task.wait(1.5)
         if autoStartActive then
-            pcall(function()
-                scanAndPressStartButtons()
-            end)
+            pcall(scanAndPressStartButtons)
         end
     end
 end)
 
 flingButton.MouseButton1Click:Connect(function()
     flingActive = not flingActive
-    flingButton.Text = flingActive and "Fling (Baixo): ATIVADO" or "Fling (Baixo): DESATIVADO"
+    flingButton.Text = flingActive and "Fling (Spin/Void): ATIVADO" or "Fling (Spin/Void): DESATIVADO"
     flingButton.BackgroundColor3 = flingActive and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(180, 50, 50)
 end)
 
@@ -415,7 +385,6 @@ local function isValidTarget(targetChar)
     return targetRoot ~= nil
 end
 
--- Botão de Teleporte Direto até o Alvo
 tpToTargetButton.MouseButton1Click:Connect(function()
     local targetPlayer = getTargetPlayer()
     if targetPlayer and targetPlayer.Character and isValidTarget(targetPlayer.Character) then
@@ -444,7 +413,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Sistema de Flight (Voo) Suave
+-- Sistema de Flight (Voo)
 local userInputStates = {W = false, A = false, S = false, D = false, Space = false, LeftShift = false}
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -506,7 +475,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Proteção Total (Anti-Fling, Anti-Void)
+-- Proteção Total
 RunService.Stepped:Connect(function()
     if not antiFlingActive then return end
     
@@ -538,16 +507,11 @@ RunService.Stepped:Connect(function()
             root.AssemblyAngularVelocity = Vector3.zero
             root.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
         end
-
-        if not flingActive and not flightActive and (root.AssemblyLinearVelocity.Magnitude > 180 or root.AssemblyAngularVelocity.Magnitude > 180) then
-            root.AssemblyLinearVelocity = Vector3.zero
-            root.AssemblyAngularVelocity = Vector3.zero
-        end
     end
 end)
 
 -- ==============================================================
--- LOOP DE FLING NORMAL (JOGA O PLAYER PARA O FUNDO DO MAPA)
+-- NOVO LOOP DE FLING (SPIN & CFRAME FORCE - BURLA ANTI-CHEAT)
 -- ==============================================================
 task.spawn(function()
     while true do
@@ -565,38 +529,26 @@ task.spawn(function()
             continue
         end
 
-        local function applyDownwardFling(targetRoot)
+        local function applySpinFling(targetRoot)
             pcall(function()
                 humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-                
                 for _, myPart in ipairs(character:GetChildren()) do
                     if myPart:IsA("BasePart") then
                         myPart.CanCollide = true
                         myPart.Massless = false
                     end
                 end
-                rootPart.CustomPhysicalProperties = PhysicalProperties.new(100, 1, 0, 1, 0)
-
-                targetRoot.CanCollide = true
-                for _, part in ipairs(targetRoot.Parent:GetChildren()) do
-                    if part:IsA("BasePart") then part.CanCollide = true end
-                end
+                rootPart.CustomPhysicalProperties = PhysicalProperties.new(100, 2, 2, 2, 2)
             end)
 
-            local offset = CFrame.new(
-                math.random(-60, 60) / 100, 
-                1.0, 
-                math.random(-60, 60) / 100
-            ) * CFrame.Angles(math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)))
-
-            rootPart.CFrame = targetRoot.CFrame * offset
-            -- Joga com força máxima para baixo (Void)
-            rootPart.AssemblyLinearVelocity = Vector3.new(
-                math.random(-15000, 15000), 
-                math.random(-85000, -65000), 
-                math.random(-15000, 15000)
-            )
-            rootPart.AssemblyAngularVelocity = Vector3.new(999999, 999999, 999999)
+            -- Rotação veloz e teleporte milimétrico ao redor do alvo para forçar o motor de física a arremessá-lo
+            local angle = tick() * 65
+            local offset = CFrame.new(math.sin(angle) * 1.5, 0.5, math.cos(angle) * 1.5)
+            rootPart.CFrame = targetRoot.CFrame * offset * CFrame.Angles(math.rad(math.random(0, 360)), math.rad(math.random(0, 360)), math.rad(math.random(0, 360)))
+            
+            -- Velocidade angular massiva combinada com empurrão para baixo
+            rootPart.AssemblyLinearVelocity = Vector3.new(math.random(-5000, 5000), -50000, math.random(-5000, 5000))
+            rootPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
         end
 
         if todosActive then
@@ -611,9 +563,7 @@ task.spawn(function()
                 end
             end
 
-            table.sort(validTargets, function(a, b)
-                return a.dist < b.dist
-            end)
+            table.sort(validTargets, function(a, b) return a.dist < b.dist end)
 
             if #validTargets > 0 then
                 for _, targetData in ipairs(validTargets) do
@@ -623,14 +573,13 @@ task.spawn(function()
                     
                     if targetRoot and isValidTarget(targetChar) then
                         local startTick = tick()
-                        local duration = 1.0
-                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < duration) do
+                        while flingActive and todosActive and isValidTarget(targetChar) and (tick() - startTick < 1.0) do
                             character = LocalPlayer.Character
                             rootPart = character and character:FindFirstChild("HumanoidRootPart")
                             humanoid = character and character:FindFirstChildOfClass("Humanoid")
                             if not character or not rootPart or not humanoid then break end
 
-                            applyDownwardFling(targetRoot)
+                            applySpinFling(targetRoot)
                             RunService.Heartbeat:Wait()
                         end
                     end
@@ -651,7 +600,7 @@ task.spawn(function()
                         humanoid = character and character:FindFirstChildOfClass("Humanoid")
                         if not character or not rootPart or not humanoid then break end
                         
-                        applyDownwardFling(targetRoot)
+                        applySpinFling(targetRoot)
                         RunService.Heartbeat:Wait()
                     end
                 end
